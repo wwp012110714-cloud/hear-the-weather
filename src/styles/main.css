@@ -1,0 +1,184 @@
+:root {
+  --font-sans: "PingFang SC", "HarmonyOS Sans SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans SC", -apple-system, BlinkMacSystemFont,
+    system-ui, sans-serif;
+  --font-serif: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC",
+    serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Menlo", "Consolas",
+    monospace;
+
+  --sky-top: #143252;
+  --sky-mid: #214e78;
+  --sky-bottom: #2f668a;
+  --sky-glow: rgba(251, 191, 36, 0.22);
+
+  --accent: #fbbf24;
+  --accent-soft: rgba(251, 191, 36, 0.16);
+  --accent-border: rgba(251, 191, 36, 0.42);
+  --accent-text: #fde68a;
+
+  --surface-1: rgba(11, 20, 34, 0.62);
+  --surface-2: rgba(15, 26, 44, 0.48);
+  --surface-3: rgba(255, 255, 255, 0.06);
+  --surface-hover: rgba(255, 255, 255, 0.11);
+  --border-subtle: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.22);
+
+  --text-primary: #f8fafc;
+  --text-secondary: rgba(241, 245, 249, 0.78);
+  --text-muted: rgba(203, 213, 225, 0.58);
+
+  --radius-xl: 24px;
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 20px 48px -16px rgba(4, 10, 22, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* 天象主题色板：随城市实时天气与昼夜平滑过渡 */
+[data-sky="sunny-day"] {
+  --sky-top: #14365b;
+  --sky-mid: #215785;
+  --sky-bottom: #38759c;
+  --sky-glow: rgba(252, 211, 77, 0.28);
+  --accent: #fbbf24;
+  --accent-soft: rgba(251, 191, 36, 0.16);
+  --accent-border: rgba(251, 191, 36, 0.44);
+  --accent-text: #fde68a;
+}
+
+[data-sky="cloudy-day"] {
+  --sky-top: #1a2d3d;
+  --sky-mid: #2b4559;
+  --sky-bottom: #3f5e73;
+  --sky-glow: rgba(125, 211, 252, 0.2);
+  --accent: #7dd3fc;
+  --accent-soft: rgba(125, 211, 252, 0.15);
+  --accent-border: rgba(125, 211, 252, 0.4);
+  --accent-text: #bae6fd;
+}
+
+[data-sky="rainy"] {
+  --sky-top: #0f1e2c;
+  --sky-mid: #1a3244;
+  --sky-bottom: #26475a;
+  --sky-glow: rgba(56, 189, 248, 0.2);
+  --accent: #38bdf8;
+  --accent-soft: rgba(56, 189, 248, 0.16);
+  --accent-border: rgba(56, 189, 248, 0.42);
+  --accent-text: #bae6fd;
+}
+
+[data-sky="storm"] {
+  --sky-top: #101326;
+  --sky-mid: #1d2340;
+  --sky-bottom: #2a3454;
+  --sky-glow: rgba(245, 158, 11, 0.2);
+  --accent: #f59e0b;
+  --accent-soft: rgba(245, 158, 11, 0.17);
+  --accent-border: rgba(245, 158, 11, 0.42);
+  --accent-text: #fde68a;
+}
+
+[data-sky="snowy"] {
+  --sky-top: #152538;
+  --sky-mid: #243d59;
+  --sky-bottom: #385878;
+  --sky-glow: rgba(224, 242, 254, 0.24);
+  --accent: #bae6fd;
+  --accent-soft: rgba(186, 230, 253, 0.16);
+  --accent-border: rgba(186, 230, 253, 0.45);
+  --accent-text: #e0f2fe;
+}
+
+[data-sky="clear-night"] {
+  --sky-top: #070e1c;
+  --sky-mid: #101e36;
+  --sky-bottom: #1a3050;
+  --sky-glow: rgba(253, 230, 138, 0.16);
+  --accent: #fcd34d;
+  --accent-soft: rgba(252, 211, 77, 0.14);
+  --accent-border: rgba(252, 211, 77, 0.38);
+  --accent-text: #fef08a;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  background: var(--sky-top);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input {
+  font-family: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.glass-panel {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* 骨架屏闪烁动画 */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-block {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 25%,
+    rgba(255, 255, 255, 0.13) 50%,
+    rgba(255, 255, 255, 0.05) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite linear;
+  border-radius: 10px;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

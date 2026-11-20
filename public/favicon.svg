@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E4068"/>
+      <stop offset="1" stop-color="#0F1F35"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="20" y1="14" x2="44" y2="38" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCD34D"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#bg)"/>
+  <circle cx="38" cy="24" r="10" fill="url(#sun)"/>
+  <path d="M18 41C13.58 41 10 37.42 10 33C10 28.92 13.06 25.56 17.02 25.06C18.67 20.36 23.14 17 28.4 17C35.03 17 40.4 22.37 40.4 29C40.4 29.38 40.38 29.75 40.34 30.12C43.54 30.72 46 33.53 46 36.92C46 40.83 42.83 44 38.92 44H18V41Z" fill="#F8FAFC" fill-opacity="0.92"/>
+  <rect x="22" y="47" width="3" height="7" rx="1.5" fill="#7DD3FC"/>
+  <rect x="28" y="45" width="3" height="11" rx="1.5" fill="#FCD34D"/>
+  <rect x="34" y="48" width="3" height="6" rx="1.5" fill="#7DD3FC"/>
+  <rect x="40" y="46" width="3" height="9" rx="1.5" fill="#7DD3FC"/>
+</svg>
