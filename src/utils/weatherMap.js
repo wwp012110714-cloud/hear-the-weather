@@ -79,6 +79,8 @@ export function getWeatherMeta(code = 0, isDay = 1, temp = 18) {
     skyTheme = 'snowy'
   } else if (!isDay) {
     skyTheme = 'clear-night'
+  } else if (temp >= 25 && code <= 2) {
+    skyTheme = 'sunny-day'
   } else if (base.category === 'cloudy' || base.category === 'fog') {
     skyTheme = 'cloudy-day'
   } else {

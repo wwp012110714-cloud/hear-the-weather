@@ -59,9 +59,10 @@
 
 | 序号 | API 名称 | Public APIs 所属分类 | 用途说明 |
 | :--- | :--- | :--- | :--- |
-| 1 | **Open-Meteo Weather & Geocoding API** | `Weather` / `Environment` | 中文城市经纬度检索、全国多城实时天气批量快照、单城实时气象、24 小时逐时预报、未来 7 天趋势及 PM2.5 / AQI 空气质量数据 |
-| 2 | **Apple iTunes Search API** | `Music` | 根据气象智能映射词组实时检索华语及氛围音乐、获取高清专辑黑胶封面与正版 AAC 音频试听流 |
-| 3 | **Hong Kong Observatory Open Data API** | `Weather` | 实时查询当日中国传统农历年份、生肖与农历月日 |
+| 1 | **Open-Meteo Weather, Geocoding & Air Quality API** | `Weather` / `Environment` | 中文城市经纬度检索、PM2.5 / AQI 空气质量指数、实时气象与多日预报 |
+| 2 | **Meteorologisk Institutt (MET Norway) API** | `Weather` | 全球高精度气象实时观测与未来 7 天预报（与 Open-Meteo 构成双源毫秒级竞速容灾） |
+| 3 | **Apple iTunes Search API** | `Music` | 根据气象智能映射词组实时检索华语及氛围音乐、获取高清专辑黑胶封面与正版 AAC 音频试听流 |
+| 4 | **Hong Kong Observatory Open Data API** | `Weather` | 实时查询当日中国传统农历年份、生肖与农历月日 |
 
 ---
 

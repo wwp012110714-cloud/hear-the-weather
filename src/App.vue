@@ -72,7 +72,7 @@
         <div class="api-status-list">
           <span class="status-item">
             <i class="status-dot" :class="{ ok: !weatherError }"></i>
-            Open-Meteo 实时气象与空气质量 API
+            Open-Meteo & MET Norway 实时气象与空气质量 API
           </span>
           <span class="status-item">
             <i class="status-dot" :class="{ ok: !musicError }"></i>
