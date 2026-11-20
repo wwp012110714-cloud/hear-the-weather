@@ -1,0 +1,9 @@
+{
+  "tool": "harness generate_image",
+  "label": "温度自记纸",
+  "surface": "desktop 1440x900",
+  "direction": "seed:1a693967e29eaf65",
+  "role": "view:trace",
+  "note": "User chose all three as switchable views with auto-tour (\"三种格式可以自动切换的话最好\")",
+  "adoptedAsView": true
+}

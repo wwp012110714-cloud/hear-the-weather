@@ -5,3 +5,9 @@ dist-ssr
 .DS_Store
 .idea
 .vscode
+
+# impeccable 工作目录中的临时文件
+.impeccable/build/
+.impeccable/review/
+.impeccable/questions/
+.impeccable/reference/

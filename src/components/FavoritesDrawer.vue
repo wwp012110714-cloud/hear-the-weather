@@ -1,210 +1,173 @@
 <template>
-  <div v-if="open" class="drawer-backdrop" @click.self="$emit('close')">
-    <aside class="favorites-drawer glass-panel" aria-label="晴雨收藏歌单">
-      <div class="drawer-head">
-        <div>
-          <h3 class="drawer-title">晴雨记忆收藏夹</h3>
-          <p class="drawer-sub">封存你在不同城市实时天气下邂逅的心动旋律</p>
-        </div>
-        <button type="button" class="close-btn" @click="$emit('close')">×</button>
-      </div>
-
-      <div v-if="items.length === 0" class="empty-fav">
-        <p>还没有封存任何晴雨曲目</p>
-        <span>点击黑胶唱机或歌单右侧的红心，即可记录当下的城市天气与音乐。</span>
-      </div>
-
-      <ul v-else class="fav-list">
-        <li
-          v-for="fav in items"
-          :key="fav.id"
-          class="fav-card"
-        >
-          <img :src="fav.coverSm" :alt="fav.title" class="fav-cover" />
-          <div class="fav-info">
-            <div class="fav-song">{{ fav.title }}</div>
-            <div class="fav-artist">{{ fav.artist }}</div>
-            <div class="fav-stamp">
-              收藏于 {{ fav.savedCity }} · {{ fav.savedWeather }}
-            </div>
-          </div>
-          <div class="fav-actions">
-            <button
-              type="button"
-              class="play-fav-btn"
-              title="在唱机中播放"
-              @click="$emit('play-fav', fav)"
-            >
-              播放
+  <Transition name="drawer">
+    <div v-if="open" class="drawer-layer" @keydown.esc="$emit('close')">
+      <div class="scrim" aria-hidden="true" @click="$emit('close')"></div>
+      <aside ref="panel" class="drawer" role="dialog" aria-modal="true" aria-labelledby="fav-h" tabindex="-1">
+        <header class="d-head">
+          <h2 id="fav-h" class="d-title">收藏簿</h2>
+          <button type="button" class="icon-btn" aria-label="合上收藏簿" @click="$emit('close')">
+            <ChartIcon name="close" />
+          </button>
+        </header>
+        <p class="d-note">每首歌都记下了收藏时的城市与天气。</p>
+        <ol v-if="items.length" class="d-list">
+          <li v-for="f in items" :key="f.id" class="d-item">
+            <button type="button" class="d-play" :aria-label="`播放 ${f.title}`" @click="$emit('play-fav', f)">
+              <span class="d-song">{{ f.artist }}《{{ f.title }}》</span>
+              <span class="d-meta num">{{ f.savedCity }} · {{ f.savedWeather }}</span>
             </button>
-            <button
-              type="button"
-              class="del-fav-btn"
-              title="移除收藏"
-              @click="$emit('remove-fav', fav.id)"
-            >
-              移除
+            <button type="button" class="icon-btn" :aria-label="`从收藏簿移除 ${f.title}`" @click="$emit('remove-fav', f.id)">
+              <ChartIcon name="close" :size="16" />
             </button>
-          </div>
-        </li>
-      </ul>
-    </aside>
-  </div>
+          </li>
+        </ol>
+        <p v-else class="d-empty">还没有收藏。播放时点播放器右侧的星标，就会记在这里。</p>
+      </aside>
+    </div>
+  </Transition>
 </template>
 
 <script setup>
-defineProps({
-  open: {
-    type: Boolean,
-    default: false
-  },
-  items: {
-    type: Array,
-    default: () => []
-  }
+import { ref, watch, nextTick } from 'vue'
+import ChartIcon from './ChartIcon.vue'
+
+const props = defineProps({
+  open: { type: Boolean, default: false },
+  items: { type: Array, default: () => [] }
 })
 
 defineEmits(['close', 'play-fav', 'remove-fav'])
+
+const panel = ref(null)
+let lastFocus = null
+
+watch(
+  () => props.open,
+  async (v) => {
+    if (v) {
+      lastFocus = document.activeElement
+      await nextTick()
+      panel.value?.focus()
+    } else if (lastFocus && lastFocus.focus) {
+      lastFocus.focus()
+    }
+  }
+)
 </script>
 
 <style scoped>
-.drawer-backdrop {
+.drawer-layer {
   position: fixed;
   inset: 0;
-  background: rgba(4, 9, 18, 0.62);
-  backdrop-filter: blur(6px);
-  z-index: 80;
-  display: flex;
-  justify-content: flex-end;
+  z-index: 50;
 }
 
-.favorites-drawer {
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(27, 24, 20, 0.28);
+}
+
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
   width: min(420px, 92vw);
-  height: 100%;
-  border-radius: 24px 0 0 24px;
-  padding: 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  padding: 18px 22px;
+  background-color: var(--paper);
+  background-image: url('../assets/paper.jpg');
+  background-size: 192px 192px;
+  border-left: 1px solid var(--rule);
+  box-shadow: -18px 0 40px -24px rgba(27, 24, 20, 0.45);
+  overflow-y: auto;
+  outline: none;
 }
 
-.drawer-head {
+.d-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 8px;
 }
 
-.drawer-title {
+.d-title {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
 }
 
-.drawer-sub {
-  margin: 4px 0 0;
-  font-size: 0.78rem;
-  color: var(--text-secondary);
+.d-note {
+  margin: 10px 0 12px;
+  font-size: 0.875rem;
+  color: var(--ink-3);
 }
 
-.close-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1px solid var(--border-subtle);
-  background: rgba(255, 255, 255, 0.07);
-  font-size: 1.2rem;
-  line-height: 1;
-}
-
-.empty-fav {
-  margin: auto 0;
-  text-align: center;
-  padding: 24px;
-  color: var(--text-secondary);
-}
-
-.empty-fav p {
-  font-size: 0.95rem;
-  font-weight: 600;
-  margin: 0 0 6px;
-}
-
-.empty-fav span {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-
-.fav-list {
+.d-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  overflow-y: auto;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.d-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.d-play {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 4px;
+  text-align: left;
+  transition: background-color var(--dur-fast) ease;
 }
 
-.fav-card {
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  display: grid;
-  grid-template-columns: 48px 1fr auto;
-  align-items: center;
-  gap: 10px;
+.d-play:hover {
+  background: rgba(44, 90, 138, 0.06);
 }
 
-.fav-cover {
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
-  object-fit: cover;
-}
-
-.fav-info {
-  min-width: 0;
-}
-
-.fav-song {
-  font-size: 0.88rem;
-  font-weight: 600;
+.d-song {
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.fav-artist {
-  font-size: 0.76rem;
-  color: var(--text-secondary);
-  margin-top: 2px;
+.d-meta {
+  font-size: 0.8125rem;
+  color: var(--ink-3);
 }
 
-.fav-stamp {
-  margin-top: 4px;
-  font-size: 0.7rem;
-  color: var(--accent-text);
+.d-empty {
+  color: var(--ink-2);
+  font-size: 0.9375rem;
 }
 
-.fav-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+.drawer-enter-active,
+.drawer-leave-active {
+  transition: opacity var(--dur-base) ease;
 }
 
-.play-fav-btn,
-.del-fav-btn {
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  border: 1px solid var(--border-subtle);
-  background: rgba(255, 255, 255, 0.06);
+.drawer-enter-active .drawer,
+.drawer-leave-active .drawer {
+  transition: transform 360ms var(--ease-out);
 }
 
-.play-fav-btn {
-  border-color: var(--accent-border);
-  color: var(--accent-text);
+.drawer-enter-from,
+.drawer-leave-to {
+  opacity: 0;
+}
+
+.drawer-enter-from .drawer,
+.drawer-leave-to .drawer {
+  transform: translateX(100%);
 }
 </style>

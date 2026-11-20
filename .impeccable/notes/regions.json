@@ -1,0 +1,17 @@
+{"regions":[
+ {"id":"masthead","kind":"chrome","codeDrawn":true,"pixelBox":{"x":0,"y":0,"w":1312,"h":66},"note":"mark + 听见天气 Hear the Weather left, search + star right, on paper"},
+ {"id":"brand","kind":"text","pixelBox":{"x":20,"y":16,"w":350,"h":40},"note":"wordmark 听见天气 serif"},
+ {"id":"search","kind":"control","codeDrawn":true,"pixelBox":{"x":1012,"y":16,"w":224,"h":38},"note":"thin outlined search field"},
+ {"id":"sheet","kind":"chrome","codeDrawn":true,"container":true,"pixelBox":{"x":24,"y":70,"w":1264,"h":670},"note":"ruled chart sheet frame with blue graticule + isobars (svg)"},
+ {"id":"paper","kind":"texture","pixelBox":{"x":1100,"y":250,"w":40,"h":40},"note":"warm chart paper ground, clean cell"},
+ {"id":"lunar","kind":"text","pixelBox":{"x":34,"y":78,"w":110,"h":22},"note":"农历 small serif"},
+ {"id":"hero-city","kind":"text","pixelBox":{"x":62,"y":140,"w":180,"h":84},"note":"成都 display Songti"},
+ {"id":"hero-temp","kind":"text","pixelBox":{"x":62,"y":232,"w":214,"h":132},"note":"16° monumental serif numerals"},
+ {"id":"readings","kind":"text","pixelBox":{"x":298,"y":138,"w":150,"h":236},"note":"key: condition, range, wind, humidity, AQI red, pressure, sun"},
+ {"id":"station-selected","kind":"control","codeDrawn":true,"pixelBox":{"x":518,"y":448,"w":100,"h":140},"note":"red station dot + barb + label 成都 16°"},
+ {"id":"station-other","kind":"control","codeDrawn":true,"pixelBox":{"x":750,"y":238,"w":120,"h":80},"note":"station glyph 北京 6° 晴, ink"},
+ {"id":"leader","kind":"chrome","codeDrawn":true,"pixelBox":{"x":560,"y":402,"w":426,"h":90},"note":"90-degree leader line to annotation"},
+ {"id":"player","kind":"control","codeDrawn":true,"pixelBox":{"x":986,"y":326,"w":264,"h":146},"note":"ruled annotation box: 正在播放 song, progress, prev/pause/next"},
+ {"id":"log","kind":"text","pixelBox":{"x":1000,"y":478,"w":240,"h":140},"note":"song log table, active row red"},
+ {"id":"trace","kind":"chrome","codeDrawn":true,"pixelBox":{"x":24,"y":744,"w":1264,"h":72},"note":"24h temperature trace + hour ticks"}
+]}

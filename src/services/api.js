@@ -241,7 +241,7 @@ export async function fetchBatchCityWeather(cities) {
   const openMeteoJob = (async () => {
     const lats = cities.map((c) => c.lat).join(',')
     const lons = cities.map((c) => c.lon).join(',')
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,weather_code,is_day&timezone=Asia%2FShanghai`
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,weather_code,is_day,wind_speed_10m,wind_direction_10m,cloud_cover&timezone=Asia%2FShanghai`
     const data = await fetchJsonWithTimeout(url, 4500)
     const list = Array.isArray(data) ? data : [data]
     const result = {}
@@ -251,7 +251,10 @@ export async function fetchBatchCityWeather(cities) {
         result[city.id] = {
           temp: Math.round(cur.temperature_2m),
           code: cur.weather_code,
-          isDay: cur.is_day
+          isDay: cur.is_day,
+          windSpeed: cur.wind_speed_10m ?? null,
+          windDirection: cur.wind_direction_10m ?? null,
+          cloudCover: cur.cloud_cover ?? null
         }
       }
     })
@@ -280,10 +283,14 @@ export async function fetchBatchCityWeather(cities) {
           'clearsky_day'
         if (temp != null) {
           const parsed = parseMetSymbol(sym, 1)
+          const det = ts0?.data?.instant?.details || {}
           fallback[city.id] = {
             temp: Math.round(temp),
             code: parsed.code,
-            isDay: parsed.isDay
+            isDay: parsed.isDay,
+            windSpeed: det.wind_speed != null ? Math.round(det.wind_speed * 36) / 10 : null,
+            windDirection: det.wind_from_direction ?? null,
+            cloudCover: det.cloud_area_fraction ?? null
           }
         }
       }

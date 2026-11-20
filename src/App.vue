@@ -1,112 +1,81 @@
 <template>
-  <div class="app-root" :data-sky="activeSkyTheme">
-    <!-- 天气极光层（Aurora UI）：颜色随实时天象变化 -->
-    <div class="aurora-layer" aria-hidden="true">
-      <span class="aurora-blob blob-a"></span>
-      <span class="aurora-blob blob-b"></span>
-      <span class="aurora-blob blob-c"></span>
-      <span class="aurora-grain"></span>
-    </div>
+  <div class="app">
+    <a class="skip" href="#sheet">跳到天气图</a>
 
-    <!-- 背景天象粒子画布 -->
-    <WeatherCanvas :sky-theme="activeSkyTheme" :enabled="canvasEnabled" />
+    <ChartMasthead
+      :view="view"
+      :touring="touring"
+      :favorites-count="favorites.length"
+      :locating="locating"
+      @set-view="handleSetView"
+      @toggle-tour="toggleTour"
+      @select-city="handleSelectCity"
+      @random-roam="handleRandomRoam"
+      @locate-me="handleLocateMe"
+      @open-favorites="favoritesOpen = true"
+    />
 
-    <!-- 主内容容器 -->
-    <div class="page-wrapper">
-      <AppHeader
-        class="reveal"
-        style="--i: 0"
-        :lunar-text="lunarText"
-        :favorites-count="favorites.length"
-        :canvas-enabled="canvasEnabled"
-        :locating="locating"
-        @select-city="handleSelectCity"
-        @random-roam="handleRandomRoam"
-        @locate-me="handleLocateMe"
-        @toggle-canvas="canvasEnabled = !canvasEnabled"
-        @open-favorites="favoritesOpen = true"
-      />
+    <main class="sheet-wrap">
+      <p class="sheet-title">
+        <span>地面填图</span>
+        <span class="num">{{ chartDate }}</span>
+        <span v-if="lunarText">农历 {{ lunarText }}</span>
+        <span class="sheet-src">数据：Open-Meteo · MET Norway · iTunes · Radio Browser</span>
+      </p>
 
-      <!-- 城市实时天气漫游条 -->
-      <CityRoamBar
-        class="reveal"
-        style="--i: 1"
-        :cities="roamBarCities"
-        :current-city="currentCity"
-        :snapshots="citySnapshots"
-        @select-city="handleSelectCity"
-      />
+      <p v-if="toastMessage" class="sheet-toast" role="status">
+        <span>附注：{{ toastMessage }}</span>
+        <button type="button" class="chart-btn" @click="toastMessage = ''">知道了</button>
+      </p>
 
-      <!-- 定位或全局通知横幅 -->
-      <div v-if="toastMessage" class="toast-banner glass-panel" role="status">
-        <span>{{ toastMessage }}</span>
-        <button type="button" class="toast-close" @click="toastMessage = ''">知道了</button>
+      <div id="sheet" class="sheet" :class="{ compact }" tabindex="-1">
+        <Transition name="sheet-view" mode="out-in">
+          <component
+            :is="viewComponent"
+            :key="view"
+            v-bind="viewProps"
+            @select-city="handleSelectCity"
+            @toggle-favorite="handleToggleFavorite"
+            @retry="loadCityWeatherAndMusic"
+            @retry-music="loadMusicOnly"
+          />
+        </Transition>
       </div>
+    </main>
 
-      <!-- 双栏核心交互工作区：左侧看天气，右侧听天气 -->
-      <main class="studio-grid">
-        <WeatherPanel
-          class="reveal"
-          style="--i: 2"
-          :city="currentCity"
-          :weather="weatherData"
-          :loading="weatherLoading"
-          :error="weatherError"
-          :selected-day-index="selectedDayIndex"
-          @retry="loadCityWeatherAndMusic"
-          @select-day="handleSelectDay"
-        />
+    <section class="below">
+      <ForecastTable
+        :days="weatherCityId === currentCity.id ? weatherData?.daily7 || [] : []"
+        :selected="selectedDayIndex"
+        :loading="weatherLoading"
+        @select-day="handleSelectDay"
+      />
+      <RadioSettings
+        :profile="musicProfile"
+        :genre-mode="genreMode"
+        :custom-active="customQueryActive"
+        :custom-term="customAppliedTerm"
+        :loading="musicLoading"
+        :ambient-running="ambientRunning"
+        :ambient-mix="ambientMix"
+        @change-genre="handleGenreChange"
+        @custom-search="handleCustomSongSearch"
+        @reset-custom="handleResetCustom"
+        @next-batch="handleNextBatch"
+        @toggle-ambient="handleToggleAmbient"
+        @update-ambient-mix="handleUpdateAmbientMix"
+        @reset-ambient-preset="handleResetAmbientPreset"
+      />
+    </section>
 
-        <MusicRadioPanel
-          class="reveal"
-          style="--i: 3"
-          :profile="musicProfile"
-          :tracks="tracks"
-          :loading="musicLoading"
-          :error="musicError"
-          :genre-mode="genreMode"
-          :custom-query-active="customQueryActive"
-          :custom-applied-term="customAppliedTerm"
-          :favorite-ids="favoriteIds"
-          :external-track="externalTrack"
-          :ambient-running="ambientRunning"
-          :ambient-mix="ambientMix"
-          :fallback-notice="musicFallbackNotice"
-          @change-genre="handleGenreChange"
-          @custom-search="handleCustomSongSearch"
-          @reset-custom="handleResetCustom"
-          @next-batch="handleNextBatch"
-          @retry="loadMusicOnly"
-          @toggle-favorite="handleToggleFavorite"
-          @toggle-ambient="handleToggleAmbient"
-          @update-ambient-mix="handleUpdateAmbientMix"
-          @reset-ambient-preset="handleResetAmbientPreset"
-        />
-      </main>
+    <footer class="colophon">
+      <p>
+        气象：Open-Meteo / MET Norway（自动择快）· 空气质量：Open-Meteo Air Quality · 农历：香港天文台 ·
+        歌曲：Apple iTunes Search，备用 Deezer · 直播：Radio Browser。全部来自 GitHub public-apis 目录，实时请求。
+      </p>
+      <p>等温线由各测站实况气温插值绘出，间隔 4°C；站点符号按地面填图惯例：圈内涂黑表示云量，风羽指向来风方向。</p>
+    </footer>
 
-      <!-- 底部公共 API 实时数据源说明 -->
-      <footer class="site-footer glass-panel reveal" style="--i: 4">
-        <div class="api-status-list">
-          <span class="status-item">
-            <i class="status-dot" :class="{ ok: !weatherError }" aria-hidden="true"></i>
-            Open-Meteo & MET Norway 实时气象与空气质量 API
-          </span>
-          <span class="status-item">
-            <i class="status-dot" :class="{ ok: !musicError }" aria-hidden="true"></i>
-            Apple iTunes & Radio Browser 音乐电台 API
-          </span>
-          <span class="status-item">
-            <i class="status-dot" :class="{ ok: Boolean(lunarText) }" aria-hidden="true"></i>
-            中国香港天文台农历开放数据 API
-          </span>
-        </div>
-        <div class="footer-note">
-          听见天气 · 所有气象指标与推荐歌单均由 GitHub Public APIs 动态实时获取
-        </div>
-      </footer>
-    </div>
-
-    <!-- 晴雨记忆收藏抽屉 -->
     <FavoritesDrawer
       :open="favoritesOpen"
       :items="favorites"
@@ -118,20 +87,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import AppHeader from './components/AppHeader.vue'
-import CityRoamBar from './components/CityRoamBar.vue'
-import WeatherCanvas from './components/WeatherCanvas.vue'
-import WeatherPanel from './components/WeatherPanel.vue'
-import MusicRadioPanel from './components/MusicRadioPanel.vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import ChartMasthead from './components/ChartMasthead.vue'
+import ViewMap from './components/ViewMap.vue'
+import ViewStation from './components/ViewStation.vue'
+import ViewTrace from './components/ViewTrace.vue'
+import ForecastTable from './components/ForecastTable.vue'
+import RadioSettings from './components/RadioSettings.vue'
 import FavoritesDrawer from './components/FavoritesDrawer.vue'
 
-import {
-  FEATURED_CITIES,
-  ROAM_CITY_POOL,
-  getWeatherMeta,
-  deriveMusicProfile
-} from './utils/weatherMap'
+import { FEATURED_CITIES, ROAM_CITY_POOL, getWeatherMeta, deriveMusicProfile } from './utils/weatherMap'
 import {
   fetchBatchCityWeather,
   fetchCityFullWeather,
@@ -140,20 +105,31 @@ import {
   fetchDomesticMusicStations
 } from './services/api'
 import { WeatherSoundscape } from './utils/soundscape'
+import { usePlayer } from './composables/usePlayer'
 
 const FAVORITES_STORAGE_KEY = 'hear_the_weather_favorites_v1'
+const TOUR_MS = 9000
+const VIEW_ORDER = ['map', 'station', 'trace']
+
+const player = usePlayer()
+
+// 图式与自动轮换
+const view = ref('map')
+const touring = ref(true)
+const compact = ref(false)
+let tourTimer = null
 
 // 城市与漫游状态
 const roamBarCities = ref([...FEATURED_CITIES])
 const currentCity = ref(FEATURED_CITIES[0])
 const citySnapshots = ref({})
 const lunarText = ref('')
-const canvasEnabled = ref(true)
 const locating = ref(false)
 const toastMessage = ref('')
 
 // 气象状态
 const weatherData = ref(null)
+const weatherCityId = ref(null)
 const weatherLoading = ref(false)
 const weatherError = ref('')
 const selectedDayIndex = ref(null)
@@ -167,19 +143,26 @@ const genreMode = ref('auto')
 const batchIndex = ref(0)
 const customQueryActive = ref(false)
 const customAppliedTerm = ref('')
-const externalTrack = ref(null)
 
-// 环境白噪音合成器状态
+// 环境声
 const soundscape = new WeatherSoundscape()
 const ambientRunning = ref(false)
 const ambientMix = ref({ rain: 0, wind: 20, hearth: 0, chimes: 25 })
 
-// 收藏夹状态
+// 收藏簿
 const favoritesOpen = ref(false)
 const favorites = ref(loadFavoritesFromStorage())
 const favoriteIds = computed(() => new Set(favorites.value.map((f) => f.id)))
 
-// 当前生效的天气（实时 或 用户点选的 7 日预报某一天）
+const viewComponent = computed(() => ({ map: ViewMap, station: ViewStation, trace: ViewTrace })[view.value])
+
+const chartDate = computed(() => {
+  const d = new Date()
+  const w = '日一二三四五六'[d.getDay()]
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 周${w} ${String(d.getHours()).padStart(2, '0')}时`
+})
+
+// 当前生效的天气（实况，或用户在七日预报中点选的那一天）
 const effectiveWeather = computed(() => {
   if (!weatherData.value) {
     return { code: 0, isDay: 1, temp: 18, windSpeed: 6, precipitation: 0 }
@@ -197,11 +180,6 @@ const effectiveWeather = computed(() => {
   return weatherData.value.current
 })
 
-const activeSkyTheme = computed(() => {
-  const ew = effectiveWeather.value
-  return getWeatherMeta(ew.code, ew.isDay, ew.temp).skyTheme
-})
-
 const musicProfile = computed(() => {
   const ew = effectiveWeather.value
   return deriveMusicProfile({
@@ -216,6 +194,79 @@ const musicProfile = computed(() => {
   })
 })
 
+const basis = computed(() => {
+  if (customQueryActive.value) return `点歌 · ${customAppliedTerm.value}`
+  const ew = effectiveWeather.value
+  const meta = getWeatherMeta(ew.code, ew.isDay, ew.temp)
+  if (selectedDayIndex.value != null && weatherData.value?.daily7?.[selectedDayIndex.value]) {
+    return `按${weatherData.value.daily7[selectedDayIndex.value].dayLabel}预报 · ${meta.short}`
+  }
+  if (!weatherData.value) return ''
+  return `按实况 · ${meta.short} ${Math.round(ew.temp)}°`
+})
+
+const stations = computed(() =>
+  roamBarCities.value.map((c) => ({ city: c, snap: citySnapshots.value[c.id] || null }))
+)
+
+const viewProps = computed(() => ({
+  city: currentCity.value,
+  // 只把属于当前城市的数据交给图面，切换城市时先显示「观测中」，不残留上一座城的读数
+  weather: weatherCityId.value === currentCity.value.id ? weatherData.value : null,
+  loading: weatherLoading.value,
+  error: weatherError.value,
+  stations: stations.value,
+  tracks: tracks.value,
+  musicLoading: musicLoading.value,
+  musicError: musicError.value,
+  basis: basis.value,
+  favoriteIds: favoriteIds.value,
+  fallbackNotice: musicFallbackNotice.value,
+  compact: compact.value
+}))
+
+/* ---------- 自动轮换 ---------- */
+function scheduleTour() {
+  if (tourTimer) clearTimeout(tourTimer)
+  tourTimer = null
+  if (!touring.value) return
+  tourTimer = setTimeout(() => {
+    if (!touring.value) return
+    if (document.hidden || favoritesOpen.value) {
+      scheduleTour()
+      return
+    }
+    const i = VIEW_ORDER.indexOf(view.value)
+    view.value = VIEW_ORDER[(i + 1) % VIEW_ORDER.length]
+  }, TOUR_MS)
+}
+
+function stopTour() {
+  touring.value = false
+  if (tourTimer) clearTimeout(tourTimer)
+  tourTimer = null
+}
+
+function toggleTour() {
+  touring.value = !touring.value
+  scheduleTour()
+}
+
+function handleSetView(id) {
+  stopTour()
+  view.value = id
+}
+
+// 访客一旦动手操作（点击或按键），就停下轮换，把图面交给他
+function onUserIntent(e) {
+  if (!touring.value) return
+  if (e.target?.closest?.('.tour-btn')) return
+  stopTour()
+}
+
+watch(view, scheduleTour)
+
+/* ---------- 数据 ---------- */
 function loadFavoritesFromStorage() {
   try {
     const raw = localStorage.getItem(FAVORITES_STORAGE_KEY)
@@ -229,7 +280,7 @@ function saveFavoritesToStorage() {
   try {
     localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites.value))
   } catch {
-    // 忽略无痕模式存储限制
+    // 无痕模式下忽略
   }
 }
 
@@ -237,7 +288,7 @@ function showToast(msg) {
   toastMessage.value = msg
   setTimeout(() => {
     if (toastMessage.value === msg) toastMessage.value = ''
-  }, 4500)
+  }, 5000)
 }
 
 let requestSeq = 0
@@ -252,31 +303,30 @@ async function loadCityWeatherAndMusic() {
     const data = await fetchCityFullWeather(currentCity.value.lat, currentCity.value.lon)
     if (seq !== requestSeq) return
     weatherData.value = data
-
-    // 同步更新顶栏漫游胶囊上的该城市实时温度
+    weatherCityId.value = currentCity.value.id
     citySnapshots.value = {
       ...citySnapshots.value,
       [currentCity.value.id]: {
         temp: Math.round(data.current.temp),
         code: data.current.code,
-        isDay: data.current.isDay
+        isDay: data.current.isDay,
+        windSpeed: data.current.windSpeed,
+        windDirection: data.current.windDirection,
+        cloudCover: data.current.cloudCover
       }
     }
-
-    // 同步该城市实时天气对应的环境混音比例
     syncAmbientToWeather()
     await loadMusicOnly(seq)
   } catch (err) {
     if (seq !== requestSeq) return
-    weatherError.value = err?.message || '获取城市实时气象失败，请检查网络连接后重试'
+    weatherError.value = err?.message || '测站暂无回报，检查网络后点「重新观测」'
   } finally {
-    if (seq === requestSeq) {
-      weatherLoading.value = false
-    }
+    if (seq === requestSeq) weatherLoading.value = false
   }
 }
 
 async function loadMusicOnly(parentSeq = requestSeq) {
+  if (typeof parentSeq !== 'number') parentSeq = requestSeq
   musicLoading.value = true
   musicError.value = ''
   musicFallbackNotice.value = ''
@@ -287,9 +337,7 @@ async function loadMusicOnly(parentSeq = requestSeq) {
       const meta = getWeatherMeta(ew.code, ew.isDay, ew.temp)
       list = await fetchDomesticMusicStations(meta.category, ew.isDay)
     } else {
-      const queries = customQueryActive.value
-        ? [customAppliedTerm.value]
-        : musicProfile.value.queries
+      const queries = customQueryActive.value ? [customAppliedTerm.value] : musicProfile.value.queries
       list = await fetchWeatherMusic(queries, 7, {
         allowInstrumental: genreMode.value === 'pure' || customQueryActive.value
       })
@@ -298,42 +346,41 @@ async function loadMusicOnly(parentSeq = requestSeq) {
     tracks.value = list
   } catch (err) {
     if (parentSeq !== requestSeq) return
-    // 歌曲库在当前网络下全部不可达时，自动降级到国内 FM 音乐台 MP3 直播，保证一定有歌可听
+    // 在线曲库都连不上时，自动降级到国内 FM 音乐台 MP3 直播
     if (genreMode.value !== 'cnradio') {
       try {
         const ew = effectiveWeather.value
         const meta = getWeatherMeta(ew.code, ew.isDay, ew.temp)
-        const stations = await fetchDomesticMusicStations(meta.category, ew.isDay)
+        const list = await fetchDomesticMusicStations(meta.category, ew.isDay)
         if (parentSeq !== requestSeq) return
-        if (stations.length) {
-          tracks.value = stations
-          musicFallbackNotice.value = '当前网络连不上在线歌曲库，已自动切换为国内FM音乐台（MP3 全长直播）'
+        if (list.length) {
+          tracks.value = list
+          musicFallbackNotice.value = '在线曲库暂时连不上，已改播国内 FM 音乐台直播。'
           return
         }
       } catch {
-        // 两者都失败时展示错误
+        // 两条路都失败时展示错误
       }
     }
     if (parentSeq !== requestSeq) return
-    musicError.value = err?.message || '获取推荐歌单失败，请点击重试'
+    musicError.value = err?.message || '歌曲检索失败。'
   } finally {
-    if (parentSeq === requestSeq) {
-      musicLoading.value = false
-    }
+    if (parentSeq === requestSeq) musicLoading.value = false
   }
 }
 
+watch(tracks, (list) => player.setQueue(list))
+
 function syncAmbientToWeather() {
-  const preset = musicProfile.value.ambientPreset
-  ambientMix.value = { ...preset }
+  ambientMix.value = { ...musicProfile.value.ambientPreset }
   soundscape.setMix(ambientMix.value)
 }
 
 function handleSelectCity(city) {
-  const exists = roamBarCities.value.some((c) => c.id === city.id)
-  if (!exists) {
-    roamBarCities.value = [city, ...roamBarCities.value.slice(0, 11)]
+  if (!roamBarCities.value.some((c) => c.id === city.id)) {
+    roamBarCities.value = [...roamBarCities.value.slice(0, 11), city]
   }
+  if (city.id === currentCity.value.id && weatherData.value) return
   currentCity.value = city
   customQueryActive.value = false
   batchIndex.value = 0
@@ -341,36 +388,35 @@ function handleSelectCity(city) {
 }
 
 function handleRandomRoam() {
-  const candidates = ROAM_CITY_POOL.filter((c) => c.id !== currentCity.value.id)
-  const pick = candidates[Math.floor(Math.random() * candidates.length)]
+  const pool = ROAM_CITY_POOL.filter((c) => c.id !== currentCity.value.id)
+  const pick = pool[Math.floor(Math.random() * pool.length)]
   if (pick) {
     handleSelectCity(pick)
-    showToast(`已随机漫游至「${pick.name} · ${pick.vibe || pick.region}」，正在为你调频当地实时天气与旋律`)
+    showToast(`随机到了 ${pick.name}（${pick.region}）。`)
   }
 }
 
 function handleLocateMe() {
   if (!navigator.geolocation) {
-    showToast('当前浏览器不支持地理定位，可直接通过搜索框输入所在城市')
+    showToast('这个浏览器不支持定位，直接在搜索框输入城市名即可。')
     return
   }
   locating.value = true
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       locating.value = false
-      const myCity = {
+      handleSelectCity({
         id: 'my-location',
-        name: '我的当前位置',
+        name: '我的位置',
         region: '实时定位',
         vibe: '身边此刻',
         lat: pos.coords.latitude,
         lon: pos.coords.longitude
-      }
-      handleSelectCity(myCity)
+      })
     },
     () => {
       locating.value = false
-      showToast('未能获取定位权限，你可在顶部搜索框直接输入任意城市名称')
+      showToast('没有拿到定位权限，可以在搜索框直接输入城市名。')
     },
     { timeout: 8000 }
   )
@@ -404,11 +450,7 @@ function handleResetCustom() {
 }
 
 function handleNextBatch() {
-  if (customQueryActive.value) {
-    loadMusicOnly()
-    return
-  }
-  batchIndex.value += 1
+  if (!customQueryActive.value) batchIndex.value += 1
   loadMusicOnly()
 }
 
@@ -423,9 +465,9 @@ async function handleToggleAmbient() {
   }
 }
 
-function handleUpdateAmbientMix(newMix) {
-  ambientMix.value = newMix
-  soundscape.setMix(newMix)
+function handleUpdateAmbientMix(mix) {
+  ambientMix.value = mix
+  soundscape.setMix(mix)
 }
 
 function handleResetAmbientPreset() {
@@ -455,20 +497,38 @@ function handleRemoveFavorite(id) {
 }
 
 function handlePlayFavorite(fav) {
-  externalTrack.value = { ...fav, _ts: Date.now() }
   favoritesOpen.value = false
+  player.start(fav)
 }
 
-onMounted(async () => {
-  // 并行加载：当前城市完整天气与歌单 + 顶栏 10 城实时温度快照 + 今日农历
-  loadCityWeatherAndMusic()
+function measure() {
+  compact.value = window.innerWidth < 900
+}
 
+watch(currentCity, (c) => {
+  document.title = `${c.name} · 听见天气`
+})
+
+onMounted(() => {
+  measure()
+  // ?view=map|station|trace 可直接打开指定图式（同时关闭自动轮换）
+  const qv = new URLSearchParams(location.search).get('view')
+  if (VIEW_ORDER.includes(qv)) {
+    view.value = qv
+    touring.value = false
+  }
+  window.addEventListener('resize', measure)
+  window.addEventListener('pointerdown', onUserIntent, true)
+  window.addEventListener('keydown', onUserIntent, true)
+  scheduleTour()
+
+  loadCityWeatherAndMusic()
   fetchBatchCityWeather(FEATURED_CITIES)
     .then((snaps) => {
-      citySnapshots.value = { ...citySnapshots.value, ...snaps }
+      const keep = citySnapshots.value[currentCity.value.id]
+      citySnapshots.value = { ...citySnapshots.value, ...snaps, ...(keep ? { [currentCity.value.id]: keep } : {}) }
     })
     .catch(() => {})
-
   fetchLunarDate()
     .then((lunar) => {
       lunarText.value = lunar
@@ -477,206 +537,153 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', measure)
+  window.removeEventListener('pointerdown', onUserIntent, true)
+  window.removeEventListener('keydown', onUserIntent, true)
+  if (tourTimer) clearTimeout(tourTimer)
   soundscape.dispose()
+  player.dispose()
 })
 </script>
 
 <style scoped>
-.app-root {
-  position: relative;
+.app {
   min-height: 100vh;
-  overflow-x: clip;
-  background:
-    radial-gradient(120% 70% at 85% -10%, var(--sky-glow), transparent 55%),
-    linear-gradient(172deg, var(--sky-top) 0%, var(--sky-mid) 46%, var(--night-base) 100%);
-  transition: background var(--dur-slow) ease;
 }
 
-/* ---------- 极光层 ---------- */
-.aurora-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.aurora-blob {
+.skip {
   position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.9;
-  transition: background 1.2s ease;
-  will-change: transform;
+  left: 12px;
+  top: -60px;
+  z-index: 60;
+  padding: 6px 12px;
+  background: var(--ink);
+  color: var(--paper);
+  text-decoration: none;
 }
 
-.blob-a {
-  width: 52vw;
-  height: 52vw;
-  max-width: 760px;
-  max-height: 760px;
-  top: -18vw;
-  left: -12vw;
-  background: radial-gradient(circle, var(--aurora-a), transparent 68%);
-  animation: auroraDrift 26s ease-in-out infinite alternate;
+.skip:focus {
+  top: 10px;
 }
 
-.blob-b {
-  width: 46vw;
-  height: 46vw;
-  max-width: 680px;
-  max-height: 680px;
-  top: 18%;
-  right: -14vw;
-  background: radial-gradient(circle, var(--aurora-b), transparent 68%);
-  animation: auroraDrift 32s ease-in-out infinite alternate-reverse;
+.sheet-wrap {
+  padding: 10px var(--gutter) 0;
 }
 
-.blob-c {
-  width: 40vw;
-  height: 40vw;
-  max-width: 600px;
-  max-height: 600px;
-  bottom: -16vw;
-  left: 28%;
-  background: radial-gradient(circle, var(--sky-glow), transparent 70%);
-  animation: auroraDrift 38s ease-in-out infinite alternate;
-}
-
-/* 细颗粒噪点，避免大面积渐变出现色带 */
-.aurora-grain {
-  position: absolute;
-  inset: 0;
-  opacity: 0.06;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-}
-
-@keyframes auroraDrift {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(6vw, 4vh, 0) scale(1.12);
-  }
-  100% {
-    transform: translate3d(-4vw, 8vh, 0) scale(0.94);
-  }
-}
-
-/* ---------- 布局 ---------- */
-.page-wrapper {
-  position: relative;
-  z-index: 5;
-  max-width: 1360px;
-  margin: 0 auto;
-  padding: var(--space-5) var(--space-5) var(--space-6);
+.sheet-title {
+  margin: 0 0 6px;
   display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 18px;
+  font-size: 0.8125rem;
+  color: var(--ink-2);
 }
 
-.toast-banner {
-  padding: 10px 16px;
-  border-radius: var(--radius-md);
-  border-color: var(--accent-border);
+.sheet-title > span:first-child {
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.1em;
+}
+
+.sheet-src {
+  margin-left: auto;
+  color: var(--ink-3);
+}
+
+.sheet-toast {
+  margin: 0 0 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--rule);
+  background: var(--paper-lift);
   font-size: 0.875rem;
-  color: var(--accent-text);
-  animation: riseIn var(--dur-base) var(--ease-out) both;
 }
 
-.toast-close {
-  min-height: 32px;
-  padding: 4px 14px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--accent-border);
-  background: transparent;
-  font-size: 0.8rem;
-  transition: background var(--dur-fast) ease;
+.sheet {
+  position: relative;
+  height: max(600px, calc(100vh - var(--masthead-h) - 46px));
+  max-height: 940px;
+  border: 1px solid var(--rule);
+  outline: 4px double transparent;
+  box-shadow:
+    0 0 0 3px var(--paper),
+    0 0 0 4px var(--rule-soft);
+  overflow: hidden;
 }
 
-.toast-close:hover {
-  background: var(--accent-soft);
+.sheet.compact {
+  height: auto;
+  max-height: none;
+  overflow: visible;
 }
 
-.studio-grid {
+/* 图式切换：新图面像记录笔一样从左向右展开 */
+.sheet-view-enter-active {
+  transition:
+    clip-path var(--dur-view) var(--ease-out),
+    opacity 200ms ease;
+}
+
+.sheet-view-leave-active {
+  transition: opacity 160ms ease;
+}
+
+.sheet-view-enter-from {
+  clip-path: inset(0 100% 0 0);
+  opacity: 0.6;
+}
+
+.sheet-view-enter-to {
+  clip-path: inset(0 0 0 0);
+}
+
+.sheet-view-leave-to {
+  opacity: 0;
+}
+
+.below {
   display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  gap: var(--space-4);
-  align-items: start;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 48px;
+  padding: 40px var(--gutter) 8px;
 }
 
-.studio-grid > * {
-  min-width: 0;
+.colophon {
+  margin: 32px var(--gutter) 0;
+  padding: 14px 0 28px;
+  border-top: 1px solid var(--rule);
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+  max-width: 80ch;
 }
 
-/* ---------- 页脚 ---------- */
-.site-footer {
-  padding: 14px 22px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  border-radius: var(--radius-lg);
+.colophon p {
+  margin: 0 0 4px;
 }
 
-.api-status-list {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  flex-wrap: wrap;
-}
-
-.status-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--warning);
-  display: inline-block;
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
-}
-
-.status-dot.ok {
-  background: var(--success);
-  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.18), 0 0 10px rgba(52, 211, 153, 0.6);
-}
-
-.footer-note {
-  color: var(--text-muted);
-}
-
-@media (max-width: 1024px) {
-  .studio-grid {
+@media (max-width: 1100px) {
+  .below {
     grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
   }
 }
 
-@media (max-width: 600px) {
-  .page-wrapper {
-    padding: 12px 12px 24px;
-    gap: 12px;
+@media (max-width: 900px) {
+  .sheet-src {
+    margin-left: 0;
   }
-  .aurora-blob {
-    filter: blur(60px);
+  .sheet-wrap {
+    padding: 10px 10px 0;
   }
-  .blob-a,
-  .blob-b,
-  .blob-c {
-    width: 90vw;
-    height: 90vw;
+  .below {
+    padding: 28px 14px 8px;
+  }
+  .colophon {
+    margin: 24px 14px 0;
   }
 }
 </style>
