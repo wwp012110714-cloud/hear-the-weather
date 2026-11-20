@@ -268,6 +268,11 @@
         </span>
       </div>
 
+      <div v-if="fallbackNotice" class="playback-notice">
+        <span>{{ fallbackNotice }}</span>
+        <button type="button" class="switch-mp3-btn" @click="$emit('retry')">重新尝试歌曲库</button>
+      </div>
+
       <!-- 加载中骨架屏 -->
       <div v-if="loading && tracks.length === 0" class="playlist-skeleton">
         <div v-for="n in 5" :key="n" class="skeleton-block" style="height: 54px"></div>
@@ -388,6 +393,10 @@ const props = defineProps({
   ambientMix: {
     type: Object,
     required: true
+  },
+  fallbackNotice: {
+    type: String,
+    default: ''
   }
 })
 
@@ -508,8 +517,8 @@ async function startTrackPlayback(track) {
   currentTime.value = 0
 
   try {
-    // 路径 A：国内 FM 音乐台实况 MP3 流
-    if (track.isLiveStream) {
+    // 路径 A：国内 FM 音乐台实况 MP3 流 / Deezer 标准 MP3 试听流 —— 原生直接播放
+    if (track.isLiveStream || track.directPlay) {
       el.src = track.previewUrl
       el.volume = volume.value
       await el.play()
@@ -522,9 +531,15 @@ async function startTrackPlayback(track) {
     // 路径 B：拉取歌曲音频字节并重写 MIME 为标准 audio/mp4
     let arrayBuf = null
     try {
-      const resp = await fetch(track.previewUrl)
-      if (resp.ok) {
-        arrayBuf = await resp.arrayBuffer()
+      const ctrl = new AbortController()
+      const abortTimer = setTimeout(() => ctrl.abort(), 9000)
+      try {
+        const resp = await fetch(track.previewUrl, { signal: ctrl.signal })
+        if (resp.ok) {
+          arrayBuf = await resp.arrayBuffer()
+        }
+      } finally {
+        clearTimeout(abortTimer)
       }
     } catch {
       arrayBuf = null

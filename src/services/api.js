@@ -6,6 +6,7 @@
  * 3. Apple iTunes Search API (Music 分类) — 华语流行与网络热歌人声检索、高清专辑封面与音频试听流
  * 4. Radio Browser API (Music 分类) — 国内在线 FM 音乐广播电台检索（蜻蜓FM .cn 纯 MP3 全长音乐直播流）
  * 5. Hong Kong Observatory Open Data API (Weather 分类) — 中国传统农历干支与节令日期
+ * 6. Deezer API (Music 分类) — iTunes 不可达时的备用人声曲库（JSONP + MP3 试听流）
  */
 
 const DEFAULT_HEADERS =
@@ -31,6 +32,73 @@ async function fetchJsonWithTimeout(url, timeoutMs = 8000) {
   } finally {
     clearTimeout(timer)
   }
+}
+
+/**
+ * JSONP 通道：通过 <script> 标签加载接口，完全绕开 fetch 的 CORS/预检/代理拦截。
+ * 部分国内校园网、移动网络与浏览器插件会拦截跨域 fetch，但 <script> 加载依然可用。
+ */
+let jsonpSeq = 0
+function fetchJsonp(url, timeoutMs = 10000, callbackParam = 'callback') {
+  if (typeof document === 'undefined') {
+    return Promise.reject(new Error('JSONP unavailable'))
+  }
+  return new Promise((resolve, reject) => {
+    const cbName = `__htw_jsonp_${Date.now()}_${jsonpSeq++}`
+    const script = document.createElement('script')
+    let done = false
+    const cleanup = () => {
+      done = true
+      clearTimeout(timer)
+      try {
+        delete window[cbName]
+      } catch {
+        window[cbName] = undefined
+      }
+      script.remove()
+    }
+    const timer = setTimeout(() => {
+      if (!done) {
+        cleanup()
+        reject(new Error('JSONP timeout'))
+      }
+    }, timeoutMs)
+    window[cbName] = (data) => {
+      if (done) return
+      cleanup()
+      resolve(data)
+    }
+    script.onerror = () => {
+      if (done) return
+      cleanup()
+      reject(new Error('JSONP network error'))
+    }
+    const sep = url.includes('?') ? '&' : '?'
+    script.src = `${url}${sep}${callbackParam}=${cbName}`
+    document.head.appendChild(script)
+  })
+}
+
+/**
+ * 双通道竞速：先发起 CORS fetch，1.5 秒内未成功则并行追加 JSONP 通道，谁先返回用谁。
+ */
+function fetchJsonDualChannel(url, timeoutMs = 12000, jsonpUrl = url, callbackParam = 'callback') {
+  const viaFetch = fetchJsonWithTimeout(url, timeoutMs)
+  if (typeof document === 'undefined') return viaFetch
+  const viaJsonp = new Promise((resolve, reject) => {
+    let started = false
+    const start = () => {
+      if (started) return
+      started = true
+      fetchJsonp(jsonpUrl, timeoutMs, callbackParam).then(resolve, reject)
+    }
+    const t = setTimeout(start, 1500)
+    viaFetch.catch(() => {
+      clearTimeout(t)
+      start()
+    })
+  })
+  return Promise.any([viaFetch, viaJsonp])
 }
 
 function parseMetSymbol(symbolCode = 'clearsky_day', fallbackIsDay = 1) {
@@ -498,18 +566,23 @@ export async function fetchDomesticMusicStations(weatherCategory = 'clear', isDa
   const mirrors = [
     'https://de1.api.radio-browser.info',
     'https://at1.api.radio-browser.info',
-    'https://nl1.api.radio-browser.info'
+    'https://nl1.api.radio-browser.info',
+    'https://fi1.api.radio-browser.info'
   ]
 
+  const path = '/json/stations/search?countrycode=CN&codec=MP3&https=true&hidebroken=true&order=clickcount&reverse=true&limit=45'
   let rawStations = null
-  for (const host of mirrors) {
-    try {
-      const url = `${host}/json/stations/search?countrycode=CN&codec=MP3&https=true&hidebroken=true&order=clickcount&reverse=true&limit=45`
-      rawStations = await fetchJsonWithTimeout(url, 7000)
-      if (Array.isArray(rawStations) && rawStations.length > 0) break
-    } catch {
-      // 尝试下一个镜像节点
-    }
+  try {
+    // 多镜像节点并行竞速，谁先返回非空列表用谁
+    rawStations = await Promise.any(
+      mirrors.map(async (host) => {
+        const list = await fetchJsonWithTimeout(`${host}${path}`, 12000)
+        if (!Array.isArray(list) || list.length === 0) throw new Error('empty')
+        return list
+      })
+    )
+  } catch {
+    rawStations = null
   }
 
   if (!Array.isArray(rawStations) || rawStations.length === 0) {
@@ -578,7 +651,7 @@ export async function fetchWeatherMusic(queries, limitPerQuery = 7, { allowInstr
 
   const tasks = validQueries.map((term) => {
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=HK&lang=zh_cn&media=music&entity=song&limit=${limitPerQuery}`
-    return fetchJsonWithTimeout(url, 9000)
+    return fetchJsonDualChannel(url, 12000)
   })
 
   const settled = await Promise.allSettled(tasks)
@@ -629,9 +702,61 @@ export async function fetchWeatherMusic(queries, limitPerQuery = 7, { allowInstr
     }
   }
 
-  if (tracks.length === 0 && settled.every((s) => s.status === 'rejected')) {
-    throw new Error('音乐电台接口响应超时，请稍后重试')
+  if (tracks.length > 0) {
+    return tracks.slice(0, 16)
   }
 
+  // iTunes 全部超时/被拦截时，自动切换至备用曲库 Deezer API（public-apis Music 分类，MP3 试听流）
+  try {
+    const backup = await fetchDeezerMusic(validQueries, allowInstrumental)
+    if (backup.length > 0) return backup
+  } catch {
+    // 继续向上抛出统一错误
+  }
+
+  if (settled.every((s) => s.status === 'rejected')) {
+    throw new Error('歌曲接口在当前网络下连接超时（iTunes 与 Deezer 均未响应）')
+  }
+  return []
+}
+
+/**
+ * 7. 备用曲库：Deezer API（public-apis Music 分类，公开搜索接口无需登录）
+ * 支持 JSONP（output=jsonp），试听流为标准 MP3，所有浏览器均可原生播放
+ */
+async function fetchDeezerMusic(queries, allowInstrumental = false) {
+  const bgmFilter = /(纯音乐|純音樂|轻音乐|輕音樂|伴奏|白噪音|睡眠|冥想|Instrumental|Karaoke|Backing)/i
+  const tasks = queries.slice(0, 4).map((term) => {
+    const base = `https://api.deezer.com/search?q=${encodeURIComponent(term)}&limit=6`
+    if (typeof document === 'undefined') return fetchJsonWithTimeout(base, 10000)
+    return fetchJsonp(`${base}&output=jsonp`, 10000)
+  })
+  const settled = await Promise.allSettled(tasks)
+  const seen = new Set()
+  const tracks = []
+  for (const item of settled) {
+    if (item.status !== 'fulfilled' || !Array.isArray(item.value?.data)) continue
+    for (const raw of item.value.data) {
+      if (!raw.preview || seen.has(raw.id)) continue
+      const text = `${raw.title || ''} ${raw.artist?.name || ''} ${raw.album?.title || ''}`
+      if (!allowInstrumental && bgmFilter.test(text)) continue
+      seen.add(raw.id)
+      tracks.push({
+        id: `dz-${raw.id}`,
+        title: raw.title || '未知曲目',
+        artist: raw.artist?.name || '未知音乐人',
+        album: raw.album?.title || '单曲发行',
+        genre: 'Deezer 备用曲库',
+        releaseYear: '',
+        durationMs: 30000,
+        previewUrl: raw.preview,
+        isLiveStream: false,
+        directPlay: true,
+        coverSm: raw.album?.cover_small || raw.album?.cover_medium || '',
+        coverLg: raw.album?.cover_big || raw.album?.cover_medium || '',
+        storeUrl: raw.link || ''
+      })
+    }
+  }
   return tracks.slice(0, 16)
 }

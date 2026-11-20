@@ -64,6 +64,9 @@
 | 3 | **Apple iTunes Search API** | `Music` | 根据气象智能映射词组实时检索华语流行与网络热歌、获取高清专辑黑胶封面与正版人声试听流 |
 | 4 | **Radio Browser API** | `Music` | 实时拉取国内在线 FM 音乐广播电台列表（接入 `.cn` 纯 MP3 24 小时全长音乐实况连播） |
 | 5 | **Hong Kong Observatory Open Data API** | `Weather` | 实时查询当日中国传统农历年份、生肖与农历月日 |
+| 6 | **Deezer API** | `Music` | 备用人声曲库：iTunes 在当前网络不可达时自动接管（JSONP + 标准 MP3 试听流） |
+
+> **音乐链路三级容灾**：iTunes（CORS fetch 与 JSONP 双通道竞速）→ Deezer 备用曲库 → Radio Browser 国内 FM 音乐台 MP3 直播。任何一级可用时都能出声，并在界面上提示当前使用的来源。
 
 ---
 

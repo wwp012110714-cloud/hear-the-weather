@@ -55,6 +55,7 @@
           :external-track="externalTrack"
           :ambient-running="ambientRunning"
           :ambient-mix="ambientMix"
+          :fallback-notice="musicFallbackNotice"
           @change-genre="handleGenreChange"
           @custom-search="handleCustomSongSearch"
           @reset-custom="handleResetCustom"
@@ -145,6 +146,7 @@ const selectedDayIndex = ref(null)
 const tracks = ref([])
 const musicLoading = ref(false)
 const musicError = ref('')
+const musicFallbackNotice = ref('')
 const genreMode = ref('auto')
 const batchIndex = ref(0)
 const customQueryActive = ref(false)
@@ -261,6 +263,7 @@ async function loadCityWeatherAndMusic() {
 async function loadMusicOnly(parentSeq = requestSeq) {
   musicLoading.value = true
   musicError.value = ''
+  musicFallbackNotice.value = ''
   try {
     let list = []
     if (!customQueryActive.value && genreMode.value === 'cnradio') {
@@ -278,6 +281,23 @@ async function loadMusicOnly(parentSeq = requestSeq) {
     if (parentSeq !== requestSeq) return
     tracks.value = list
   } catch (err) {
+    if (parentSeq !== requestSeq) return
+    // 歌曲库在当前网络下全部不可达时，自动降级到国内 FM 音乐台 MP3 直播，保证一定有歌可听
+    if (genreMode.value !== 'cnradio') {
+      try {
+        const ew = effectiveWeather.value
+        const meta = getWeatherMeta(ew.code, ew.isDay, ew.temp)
+        const stations = await fetchDomesticMusicStations(meta.category, ew.isDay)
+        if (parentSeq !== requestSeq) return
+        if (stations.length) {
+          tracks.value = stations
+          musicFallbackNotice.value = '当前网络连不上在线歌曲库，已自动切换为国内FM音乐台（MP3 全长直播）'
+          return
+        }
+      } catch {
+        // 两者都失败时展示错误
+      }
+    }
     if (parentSeq !== requestSeq) return
     musicError.value = err?.message || '获取推荐歌单失败，请点击重试'
   } finally {
