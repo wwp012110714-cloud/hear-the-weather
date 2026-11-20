@@ -1,10 +1,11 @@
 /**
  * 公共 API 数据服务层
- * 严格采用 GitHub public-apis/public-apis 官方收录且支持国内直连与浏览器 CORS 跨域的免费公共接口：
- * 1. Open-Meteo API (Weather & Environment 分类) — 城市中文检索、实时气象、7日预报与 PM2.5/AQI 空气质量
- * 2. Meteorologisk Institutt / MET Norway API (Weather 分类) — 全球高精度气象实时观测与多日预报（双源竞速容灾）
- * 3. Apple iTunes Search API (Music 分类) — 华语与氛围音乐检索、高清黑胶封面及正版 AAC 音频试听流
- * 4. Hong Kong Observatory Open Data API (Weather 分类) — 中国传统农历干支与节令日期
+ * 全部严格出自 GitHub public-apis/public-apis 官方免费免密钥（Auth: No, HTTPS: Yes, CORS: *）名录：
+ * 1. Open-Meteo API (Weather & Environment 分类) — 中文城市检索、PM2.5/AQI 空气质量、实时气象与预报
+ * 2. Meteorologisk Institutt / MET Norway API (Weather 分类) — 全球高精度气象双源竞速容灾
+ * 3. Apple iTunes Search API (Music 分类) — 华语流行与网络热歌人声检索、高清专辑封面与音频试听流
+ * 4. Radio Browser API (Music 分类) — 国内在线 FM 音乐广播电台检索（蜻蜓FM .cn 纯 MP3 全长音乐直播流）
+ * 5. Hong Kong Observatory Open Data API (Weather 分类) — 中国传统农历干支与节令日期
  */
 
 const DEFAULT_HEADERS =
@@ -32,9 +33,6 @@ async function fetchJsonWithTimeout(url, timeoutMs = 8000) {
   }
 }
 
-/**
- * 将 MET Norway symbol_code 归一化为标准 WMO 天气代码与昼夜标记
- */
 function parseMetSymbol(symbolCode = 'clearsky_day', fallbackIsDay = 1) {
   const isNight = symbolCode.includes('_night') || symbolCode.includes('_polartwilight')
   const isDay = symbolCode.includes('_day') ? 1 : isNight ? 0 : fallbackIsDay
@@ -56,9 +54,6 @@ function parseMetSymbol(symbolCode = 'clearsky_day', fallbackIsDay = 1) {
   return { code, isDay }
 }
 
-/**
- * 根据纬度、经度与日期计算北京时间（UTC+8）日出与日落时刻
- */
 function calcSunTimesUtc8(lat, lon, dateStr) {
   const d = new Date(`${dateStr}T12:00:00+08:00`)
   const start = new Date(Date.UTC(d.getUTCFullYear(), 0, 0))
@@ -108,9 +103,6 @@ function calcSunTimesUtc8(lat, lon, dateStr) {
   }
 }
 
-/**
- * 将 ISO UTC 时间转为北京时间 YYYY-MM-DDTHH:mm
- */
 function toBeijingIso(isoUtc) {
   const ms = new Date(isoUtc).getTime() + 8 * 3600 * 1000
   return new Date(ms).toISOString().slice(0, 16)
@@ -173,7 +165,7 @@ export async function searchCities(keyword) {
 }
 
 /**
- * 2. 批量拉取顶栏漫游城市的实时温度与天气状态（Open-Meteo 与 MET Norway 并发竞速）
+ * 2. 批量拉取顶栏漫游城市的实时温度与天气状态
  */
 export async function fetchBatchCityWeather(cities) {
   if (!cities?.length) return {}
@@ -239,9 +231,6 @@ export async function fetchBatchCityWeather(cities) {
   }
 }
 
-/**
- * 内部：通过 Open-Meteo 获取完整单城预报
- */
 async function fetchFromOpenMeteo(lat, lon) {
   const weatherUrl =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
@@ -307,9 +296,6 @@ async function fetchFromOpenMeteo(lat, lon) {
   }
 }
 
-/**
- * 内部：通过 MET Norway (api.met.no) 获取完整单城预报（毫秒级响应双源保障）
- */
 async function fetchFromMetNorway(lat, lon) {
   const url = `https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`
   const raw = await fetchJsonWithTimeout(url, 7500)
@@ -331,7 +317,6 @@ async function fetchFromMetNorway(lat, lon) {
   const curParsed = parseMetSymbol(curSym, 1)
   const curBj = toBeijingIso(curItem.time)
 
-  // 组装未来 24 小时逐时曲线
   const hourly24 = []
   for (let i = curIdx; i < Math.min(curIdx + 24, series.length); i++) {
     const item = series[i]
@@ -356,7 +341,6 @@ async function fetchFromMetNorway(lat, lon) {
     })
   }
 
-  // 按北京日期聚合未来 7 天趋势
   const byDate = new Map()
   for (const item of series) {
     const bj = toBeijingIso(item.time)
@@ -442,8 +426,7 @@ async function fetchFromMetNorway(lat, lon) {
 }
 
 /**
- * 3. 拉取选定城市的完整实时气象、24小时逐时曲线、7天趋势与空气质量
- * 采用双公共气象源竞速机制（Promise.any），确保任意网络环境下均毫秒级出数
+ * 3. 拉取选定城市的完整实时气象与空气质量
  */
 export async function fetchCityFullWeather(lat, lon) {
   const aqiUrl =
@@ -491,9 +474,105 @@ export async function fetchLunarDate(dateObj = new Date()) {
 }
 
 /**
- * 5. 动态检索音乐歌单（Apple iTunes Search API）
+ * 为电台生成高辨识度的 SVG 数据封面
  */
-export async function fetchWeatherMusic(queries, limitPerQuery = 10) {
+function buildStationCoverSvg(title, idx = 0) {
+  const palettes = [
+    ['#0F2942', '#38BDF8'],
+    ['#1F2937', '#F59E0B'],
+    ['#172554', '#A78BFA'],
+    ['#134E4A', '#34D399'],
+    ['#3B0764', '#FB7185']
+  ]
+  const [c1, c2] = palettes[idx % palettes.length]
+  const short = (title || 'FM').slice(0, 4)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient></defs><rect width="300" height="300" fill="url(#g)"/><circle cx="150" cy="150" r="108" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="2"/><text x="150" y="142" text-anchor="middle" fill="#FFFFFF" font-size="34" font-family="sans-serif" font-weight="bold">${short}</text><text x="150" y="182" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-size="18" font-family="sans-serif">LIVE FM · MP3</text></svg>`
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
+/**
+ * 5. 动态拉取国内在线 FM 音乐广播电台（Radio Browser API — public-apis Music 分类）
+ * 返回国内 .cn 蜻蜓FM 等纯 MP3 (audio/mpeg) 24 小时全长音乐流，任何浏览器 100% 原生秒播！
+ */
+export async function fetchDomesticMusicStations(weatherCategory = 'clear', isDay = 1) {
+  const mirrors = [
+    'https://de1.api.radio-browser.info',
+    'https://at1.api.radio-browser.info',
+    'https://nl1.api.radio-browser.info'
+  ]
+
+  let rawStations = null
+  for (const host of mirrors) {
+    try {
+      const url = `${host}/json/stations/search?countrycode=CN&codec=MP3&https=true&hidebroken=true&order=clickcount&reverse=true&limit=45`
+      rawStations = await fetchJsonWithTimeout(url, 7000)
+      if (Array.isArray(rawStations) && rawStations.length > 0) break
+    } catch {
+      // 尝试下一个镜像节点
+    }
+  }
+
+  if (!Array.isArray(rawStations) || rawStations.length === 0) {
+    throw new Error('国内音乐广播列表获取超时，请点击重试')
+  }
+
+  const musicRegex = /(音乐|动感|经典|金曲|流行|云梦|星空|清晨|怀集|亚洲|FM101|94\.7|103\.7)/i
+  const excludeRegex = /(新闻|交通|经济|农村|戏曲|评书|故事|伴音|CCTV|CNR-1)/i
+
+  const filtered = rawStations.filter((s) => {
+    const label = `${s.name || ''} ${s.tags || ''}`
+    const url = s.url_resolved || ''
+    return (
+      url.startsWith('https://') &&
+      musicRegex.test(label) &&
+      !excludeRegex.test(s.name || '')
+    )
+  })
+
+  // 根据当前天气状态对国内音乐台进行契合度智能排序
+  const scoreStation = (s) => {
+    const txt = `${s.name} ${s.tags}`.toLowerCase()
+    let score = 0
+    if (!isDay && /(星空|夜|云梦|经典)/.test(txt)) score += 30
+    if ((weatherCategory === 'rain' || weatherCategory === 'cloudy') && /(云梦|雨|轻|经典|怀集)/.test(txt)) score += 30
+    if (weatherCategory === 'snow' && /(古典|经典|94\.7)/.test(txt)) score += 30
+    if (weatherCategory === 'clear' && isDay && /(清晨|动感|流行|动听|亚洲)/.test(txt)) score += 30
+    if ((s.url_resolved || '').includes('qtfm.cn') || (s.url_resolved || '').includes('qingting.fm')) score += 15
+    return score
+  }
+
+  filtered.sort((a, b) => scoreStation(b) - scoreStation(a))
+
+  const seenUrls = new Set()
+  const stations = []
+  filtered.forEach((s, idx) => {
+    const cleanUrl = (s.url_resolved || '').split('?')[0]
+    if (!cleanUrl || seenUrls.has(cleanUrl)) return
+    seenUrls.add(cleanUrl)
+    const cover = buildStationCoverSvg(s.name.trim(), idx)
+    stations.push({
+      id: `radio-${s.stationuuid || idx}`,
+      title: s.name.trim(),
+      artist: '国内实况音乐广播',
+      album: '24小时全长连播 · MP3',
+      genre: '全长直播',
+      releaseYear: 'LIVE',
+      durationMs: 0,
+      previewUrl: s.url_resolved,
+      isLiveStream: true,
+      coverSm: s.favicon && s.favicon.startsWith('https://') ? s.favicon : cover,
+      coverLg: cover
+    })
+  })
+
+  return stations.slice(0, 14)
+}
+
+/**
+ * 6. 动态检索华语流行与网络热歌（Apple iTunes Search API — public-apis Music 分类）
+ * 默认精准剔除纯音乐/伴奏/白噪音，并对同名曲目去重，保证歌单全为人声好歌
+ */
+export async function fetchWeatherMusic(queries, limitPerQuery = 7, { allowInstrumental = false } = {}) {
   const validQueries = (Array.isArray(queries) ? queries : [queries]).filter(Boolean)
   if (!validQueries.length) return []
 
@@ -505,21 +584,41 @@ export async function fetchWeatherMusic(queries, limitPerQuery = 10) {
   const settled = await Promise.allSettled(tasks)
   const tracks = []
   const seenIds = new Set()
+  const seenSongKeys = new Set()
+  const bgmFilter = /(纯音乐|純音樂|轻音乐|輕音樂|伴奏|白噪音|睡眠|冥想|Instrumental|Karaoke|Backing|DJ版|纯钢琴|純鋼琴)/i
 
   for (const item of settled) {
     if (item.status === 'fulfilled' && Array.isArray(item.value?.results)) {
       for (const raw of item.value.results) {
         if (!raw.previewUrl || seenIds.has(raw.trackId)) continue
+
+        const combinedText = `${raw.trackName || ''} ${raw.artistName || ''} ${raw.collectionName || ''} ${raw.primaryGenreName || ''}`
+        if (!allowInstrumental && bgmFilter.test(combinedText)) {
+          continue
+        }
+
+        // 归一化歌名去重（避免同一首歌普通版、Live版连续重复霸屏）
+        const normTitle = (raw.trackName || '')
+          .replace(/\s*[\(（\[【].*?[\)）\]】]/g, '')
+          .trim()
+          .toLowerCase()
+        const normArtist = (raw.artistName || '').slice(0, 6).toLowerCase()
+        const songKey = `${normTitle}::${normArtist}`
+        if (seenSongKeys.has(songKey)) continue
+
         seenIds.add(raw.trackId)
+        seenSongKeys.add(songKey)
+
         tracks.push({
           id: raw.trackId,
           title: raw.trackName || '未知曲目',
           artist: raw.artistName || '未知音乐人',
           album: raw.collectionName || '单曲发行',
-          genre: raw.primaryGenreName || '华语音乐',
+          genre: raw.primaryGenreName || '华语流行',
           releaseYear: raw.releaseDate ? raw.releaseDate.slice(0, 4) : '',
           durationMs: raw.trackTimeMillis || 30000,
           previewUrl: raw.previewUrl,
+          isLiveStream: false,
           coverSm: raw.artworkUrl100 || '',
           coverLg: raw.artworkUrl100
             ? raw.artworkUrl100.replace('100x100bb', '600x600bb')

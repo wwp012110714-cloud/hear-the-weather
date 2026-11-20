@@ -33,9 +33,6 @@ export const ROAM_CITY_POOL = [
   { id: 'hongkong', name: '香港', region: '香港', lat: 22.3193, lon: 114.1694, vibe: '维港霓虹' }
 ]
 
-/**
- * WMO 国际气象代码映射表
- */
 const WMO_MAP = {
   0: { label: '晴朗无云', short: '晴', category: 'clear', icon: 'sun' },
   1: { label: '晴间微云', short: '晴间多云', category: 'clear', icon: 'partly-cloudy' },
@@ -121,46 +118,65 @@ export function getUvMeta(uv = 0) {
   return { label: '很强', tip: '高原或海滨强日照，务必做好防晒' }
 }
 
-/**
- * 生成贴合当地实时气象的一句诗意观察语
- */
 export function buildPoeticSummary({ cityName, code, isDay, temp, windSpeed, humidity }) {
   const meta = getWeatherMeta(code, isDay, temp)
   if (meta.category === 'rain') {
-    return `${cityName}此刻细雨轻落（湿度 ${humidity}%），窗外雨声淅沥，适合泡一杯热茶静听温柔慢歌。`
+    return `${cityName}此刻细雨轻落（湿度 ${humidity}%），窗外雨声淅沥，正适合听一首有故事的人声慢歌。`
   }
   if (meta.category === 'storm') {
-    return `${cityName}正值雷雨云系过境，风声与远雷交织，让舒缓的旋律陪你安坐室内。`
+    return `${cityName}正值雷雨云系过境，风声与远雷交织，让深情华语旋律陪你安坐室内。`
   }
   if (meta.category === 'snow' || temp <= -3) {
-    return `${cityName}当前气温 ${temp.toFixed(1)}°C，寒意清冽纯净，最宜围炉听一曲冬日钢琴与暖心民谣。`
+    return `${cityName}当前气温 ${temp.toFixed(1)}°C，寒意清冽纯净，最宜围炉听一首温暖治愈的冬日情歌。`
   }
   if (!isDay) {
-    return `夜幕降临${cityName}，晚风 ${windSpeed} km/h，城市灯火渐次亮起，适合调低灯光进入夜色电台。`
+    return `夜幕降临${cityName}，晚风 ${windSpeed} km/h，城市灯火渐次亮起，为你切入深夜走心人声电台。`
   }
   if (temp >= 25) {
-    return `${cityName}阳光炽热（${temp.toFixed(1)}°C），海风与热浪拂面，来一首橘子汽水味的轻快旋律吧。`
+    return `${cityName}阳光炽热（${temp.toFixed(1)}°C），海风与热浪拂面，来一首橘子汽水味的夏日热歌吧。`
   }
   if (meta.category === 'cloudy' || meta.category === 'fog') {
-    return `${cityName}云层轻拢、天色天青柔和，微凉气流拂过街巷，正适合漫不经心地放空听歌。`
+    return `${cityName}云层轻拢、天色天青柔和，微风拂过街巷，正适合循环几首耐听的华语流行与民谣。`
   }
-  return `${cityName}此刻晴空澄澈（${temp.toFixed(1)}°C），微风和煦，把阳光与好心情一起装进耳机里。`
+  return `${cityName}此刻晴空澄澈（${temp.toFixed(1)}°C），微风和煦，把阳光与好听的华语热歌一起装进耳机里。`
 }
 
 /**
- * 曲风偏好可选项
+ * 电台模式与曲风偏好选项
+ * 默认优先推送真正带人声的华语热歌/金曲，同时提供「国内FM全长直播（纯MP3无限连播）」与「治愈纯音」
  */
 export const GENRE_MODES = [
-  { id: 'auto', label: '随天气智能调频' },
-  { id: 'mandopop', label: '华语流行' },
+  { id: 'auto', label: '随天气推热歌' },
+  { id: 'netpop', label: '网络热歌' },
+  { id: 'mandopop', label: '华语经典' },
   { id: 'folk', label: '城市民谣' },
-  { id: 'pure', label: '治愈纯音' },
-  { id: 'jazz', label: '微醺爵士' }
+  { id: 'cnradio', label: '国内FM全长直播' },
+  { id: 'pure', label: '治愈纯音' }
 ]
 
 /**
+ * 城市代表人声曲目映射（增强不同城市切换时的人文辨识度）
+ */
+const CITY_VOCAL_HITS = {
+  成都: '成都 赵雷',
+  北京: '北京欢迎你 汪峰 北京',
+  大理: '去大理 郝云',
+  杭州: '江南 林俊杰',
+  拉萨: '回到拉萨 郑钧',
+  厦门: '浪花一朵朵 任贤齐',
+  哈尔滨: '认真的雪 薛之谦',
+  漠河: '漠河舞厅 柳爽',
+  三亚: '我要夏天 周杰伦',
+  重庆: '平凡之路 朴树',
+  西安: '平凡的一天 毛不易',
+  香港: '明年今日 陈奕迅',
+  台北: '忠孝东路走九遍 动力火车',
+  苏州: '青花瓷 周杰伦'
+}
+
+/**
  * 核心气象声学智能映射引擎：
- * 根据城市实时天气码、昼夜、温度、风速推导专属电台频道、检索词组与环境混音预设
+ * 默认精准匹配带人声的华语流行 & 网络热歌（自动剔除纯音乐背景音），也可切换国内 FM 全长电台或纯音
  */
 export function deriveMusicProfile({
   cityName = '成都',
@@ -174,7 +190,6 @@ export function deriveMusicProfile({
 }) {
   const meta = getWeatherMeta(code, isDay, temp)
 
-  // 计算当地自然环境声默认混音比例 (0 ~ 100)
   const ambientPreset = {
     rain: 0,
     wind: Math.min(75, Math.max(10, Math.round(windSpeed * 2.4))),
@@ -182,94 +197,167 @@ export function deriveMusicProfile({
     chimes: 0
   }
 
-  let moodTitle = '晴空微风 · 浮光掠影'
-  let moodBadge = '暖阳声景'
-  let queries = ['晴天 温柔', '微风 治愈', '夏天 清新']
+  let moodTitle = '晴空微风 · 华语晴日热歌'
+  let moodBadge = '暖阳人声'
+  let queries = [
+    '晴天 周杰伦',
+    '给你一瓶魔法药水 告五人',
+    '乌梅子酱 李荣浩',
+    '爱你 王心凌',
+    '遇见 孙燕姿',
+    '小美满 周深'
+  ]
 
   if (meta.category === 'storm') {
-    moodTitle = '雷雨夜幕 · 沉浸剧场'
-    moodBadge = '风暴声景'
-    queries = ['雷雨 钢琴', '雨夜 华语', '电影原声 治愈', '大雨 温柔']
+    moodTitle = '雷雨夜幕 · 深情华语现场'
+    moodBadge = '风暴人声'
+    queries = [
+      '龙卷风 邓紫棋',
+      '夜曲 周杰伦',
+      '不为谁而作的歌 林俊杰',
+      '突然好想你 五月天',
+      '泡沫 邓紫棋',
+      '演员 薛之谦'
+    ]
     ambientPreset.rain = 72
     ambientPreset.wind = 55
   } else if (meta.category === 'rain') {
-    moodTitle = isDay ? '烟雨微凉 · 屋檐听雨' : '夜雨敲窗 · 城市慢歌'
-    moodBadge = '雨天声景'
-    queries = ['下雨 温柔', '雨天 民谣', '细雨 纯音乐', '雨夜 华语']
+    moodTitle = isDay ? '烟雨微凉 · 雨天走心热歌' : '夜雨敲窗 · 深夜伤感流行'
+    moodBadge = '雨天人声'
+    queries = [
+      '下雨天 南拳妈妈',
+      '云烟成雨 房东的猫',
+      '哪里都是你 队长',
+      '江南 林俊杰',
+      '最长的电影 周杰伦',
+      '阴天 莫文蔚'
+    ]
     ambientPreset.rain = Math.min(82, Math.max(48, Math.round(45 + precipitation * 8)))
     ambientPreset.wind = Math.max(22, ambientPreset.wind)
   } else if (meta.category === 'snow' || temp <= -2) {
-    moodTitle = '霁雪寒林 · 围炉钢琴'
-    moodBadge = '冰雪声景'
-    queries = ['冬日 钢琴', '雪 治愈', '温暖 民谣', '下雪 华语']
+    moodTitle = '霁雪寒林 · 冬日暖心金曲'
+    moodBadge = '冰雪人声'
+    queries = [
+      '发如雪 周杰伦',
+      '认真的雪 薛之谦',
+      '明年今日 陈奕迅',
+      '雪落下的声音 陆虎',
+      '大鱼 周深',
+      '枫 周杰伦'
+    ]
     ambientPreset.hearth = 62
     ambientPreset.wind = Math.max(28, ambientPreset.wind)
   } else if (!isDay) {
-    moodTitle = temp < 10 ? '清冷星夜 · 深夜独白' : '晚风微醺 · 星夜电台'
-    moodBadge = '夜晚声景'
-    queries = ['夜晚 爵士', '晚风 温柔', '深夜 民谣', '星空 纯音乐']
+    moodTitle = temp < 10 ? '清冷星夜 · 深夜emo热歌' : '晚风微醺 · 夜色华语电台'
+    moodBadge = '星夜人声'
+    queries = [
+      '晚安 颜人中',
+      '爱人错过 告五人',
+      '年少有为 李荣浩',
+      '泡沫 邓紫棋',
+      '好久不见 陈奕迅',
+      '说谎 林宥嘉'
+    ]
     ambientPreset.chimes = 28
     if (temp < 8) ambientPreset.hearth = 38
   } else if (temp >= 25) {
-    moodTitle = '热浪海风 · 橘子汽水'
-    moodBadge = '盛夏声景'
-    queries = ['海边 夏天', '夏日 轻快', '海风 流行', '阳光 旅行']
+    moodTitle = '热浪海风 · 橘子汽水热歌'
+    moodBadge = '盛夏人声'
+    queries = [
+      '我要夏天 周杰伦',
+      '橘子汽水 南拳妈妈',
+      '宁夏 梁静茹',
+      'Mojito 周杰伦',
+      '夏日入侵企画',
+      '私奔到月球 五月天'
+    ]
     ambientPreset.wind = Math.max(42, ambientPreset.wind)
     ambientPreset.chimes = 36
   } else if (meta.category === 'cloudy' || meta.category === 'fog') {
-    moodTitle = '天青云影 · 漫步遐思'
-    moodBadge = '云雾声景'
-    queries = ['多云 治愈', '独立民谣', '午后 轻音乐', '微风 慢歌']
+    moodTitle = '天青云影 · 微风流行与民谣'
+    moodBadge = '云雾人声'
+    queries = [
+      '起风了 买辣椒也用券',
+      '平凡的一天 毛不易',
+      '美好事物 房东的猫',
+      '平凡之路 朴树',
+      '旅行的意义 陈绮贞',
+      '修炼爱情 林俊杰'
+    ]
     ambientPreset.wind = Math.max(25, ambientPreset.wind)
   } else {
-    moodTitle = temp < 12 ? '秋高气爽 · 清朗原声' : '暖阳微风 · 治愈漫游'
-    moodBadge = '晴朗声景'
-    queries = ['晴天 轻快', '微风 治愈', '午后 民谣', '旅行 华语']
+    moodTitle = temp < 12 ? '秋高气爽 · 清朗华语热歌' : '暖阳微风 · 愉悦华语热歌'
+    moodBadge = '晴朗人声'
     ambientPreset.chimes = 42
   }
 
-  // 融入城市人文音乐印记（若该城市有鲜明音乐意象且处于智能模式）
+  // 融入城市代表性人声单曲
   const cleanCity = cityName.replace(/(市|地区|自治州|特别行政区)$/, '')
-  const musicalCities = ['成都', '北京', '大理', '杭州', '拉萨', '厦门', '哈尔滨', '台北', '香港', '重庆', '西安', '武汉']
-  if (genreMode === 'auto' && musicalCities.includes(cleanCity)) {
-    queries = [`${cleanCity} 民谣`, ...queries]
+  if (genreMode === 'auto' && CITY_VOCAL_HITS[cleanCity]) {
+    queries = [CITY_VOCAL_HITS[cleanCity], ...queries]
   }
 
-  // 用户手动切换曲风偏好时，与当前天气状态交叉融合
-  const weatherWord =
-    meta.category === 'rain' || meta.category === 'storm'
-      ? '雨'
-      : meta.category === 'snow' || temp <= 0
-      ? '冬'
-      : !isDay
-      ? '夜'
-      : temp >= 25
-      ? '夏'
-      : '微风'
-
-  if (genreMode === 'mandopop') {
-    queries = [`${weatherWord} 周杰伦`, `${weatherWord} 陈奕迅`, '华语 抒情', '孙燕姿 莫文蔚']
+  // 用户手动切换曲风频道
+  if (genreMode === 'netpop') {
+    moodTitle = '全网热播 · 新生代网络热歌'
+    moodBadge = '网络热歌'
+    queries = [
+      '哪里都是你 队长',
+      '爱人错过 告五人',
+      '起风了 周深',
+      '晚安 颜人中',
+      '云烟成雨 房东的猫',
+      '乌梅子酱 李荣浩',
+      '像我这样的人 毛不易',
+      '唯一 告五人'
+    ]
+  } else if (genreMode === 'mandopop') {
+    moodTitle = '岁月留声 · 华语巅峰金曲'
+    moodBadge = '华语经典'
+    queries = [
+      '七里香 周杰伦',
+      '江南 林俊杰',
+      '十年 陈奕迅',
+      '遇见 孙燕姿',
+      '光年之外 邓紫棋',
+      '知足 五月天'
+    ]
   } else if (genreMode === 'folk') {
-    queries = [`${cleanCity} 民谣`, `${weatherWord} 民谣`, '房东的猫 民谣', '赵雷 民谣']
+    moodTitle = '街巷吉他 · 独立城市民谣'
+    moodBadge = '城市民谣'
+    queries = [
+      `${cleanCity} 民谣`,
+      '成都 赵雷',
+      '平凡之路 朴树',
+      '美好事物 房东的猫',
+      '南山南 马頔',
+      '董小姐 宋冬野'
+    ]
+  } else if (genreMode === 'cnradio') {
+    moodTitle = '国内音乐广播 · 24h 全长实况连播'
+    moodBadge = 'MP3全长直播'
+    queries = ['国内FM音乐台', '流行金曲广播']
   } else if (genreMode === 'pure') {
-    queries = [`${weatherWord} 治愈纯音乐`, '久石让 钢琴', '森林 轻音乐', '清晨 钢琴']
-  } else if (genreMode === 'jazz') {
-    queries = ['夜晚 爵士', '咖啡馆 爵士', 'Bossa Nova 轻快', '浪漫 萨克斯']
+    moodTitle = '空山静林 · 治愈钢琴与纯音'
+    moodBadge = '治愈纯音'
+    queries = ['久石让 钢琴', '治愈纯音乐', '雨天 钢琴', '森林 轻音乐']
   }
 
-  // 支持「换一批」轮换查询词顺序
   const rotated = [...queries]
-  const shift = batchIndex % rotated.length
+  const shift = (batchIndex * 2) % rotated.length
   const orderedQueries = [...rotated.slice(shift), ...rotated.slice(0, shift)]
 
   const dayText = isDay ? '白昼' : '夜晚'
-  const reasonText = `依据 ${cityName} 实时气象「${meta.label} · ${temp.toFixed(1)}°C · ${dayText} · 风速 ${windSpeed} km/h」，智能匹配 ${moodTitle} 曲库`
+  const reasonText =
+    genreMode === 'cnradio'
+      ? `依据 ${cityName} 实时气象「${meta.label} · ${temp.toFixed(1)}°C」，为你接入国内 .cn 在线音乐广播电台（纯 MP3 全曲不间断直播）`
+      : `依据 ${cityName} 实时气象「${meta.label} · ${temp.toFixed(1)}°C · ${dayText} · 风速 ${windSpeed} km/h」，智能推送契合心境的人声歌曲`
 
   return {
     moodTitle,
     moodBadge,
     reasonText,
-    queries: orderedQueries.slice(0, 2),
+    queries: orderedQueries.slice(0, 4),
     ambientPreset,
     weatherMeta: meta
   }

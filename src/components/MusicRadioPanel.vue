@@ -6,11 +6,11 @@
         <div class="badge-group">
           <span class="mood-badge">{{ customQueryActive ? '自由点歌频道' : profile.moodBadge }}</span>
           <span
-            v-for="q in profile.queries"
+            v-for="q in (customQueryActive ? [customAppliedTerm] : profile.queries.slice(0, 3))"
             :key="q"
             class="query-chip"
           >
-            # {{ customQueryActive ? customAppliedTerm : q }}
+            # {{ q }}
           </span>
         </div>
 
@@ -29,17 +29,17 @@
               stroke-linejoin="round"
             />
           </svg>
-          <span>换一批曲目</span>
+          <span>换一批好歌</span>
         </button>
       </div>
 
       <h2 class="channel-heading">
-        {{ customQueryActive ? `「${customAppliedTerm}」搜索电台` : `「${profile.moodTitle}」` }}
+        {{ customQueryActive ? `「${customAppliedTerm}」点歌电台` : `「${profile.moodTitle}」` }}
       </h2>
       <p class="reason-line">
         {{
           customQueryActive
-            ? `正在当前城市天象背景下播放「${customAppliedTerm}」相关曲目，可随时切回智能天气推歌`
+            ? `正在当前城市天象背景下播放「${customAppliedTerm}」人声曲目，可随时切回智能天气推歌`
             : profile.reasonText
         }}
       </p>
@@ -64,12 +64,12 @@
             v-model="songInput"
             type="text"
             class="song-input"
-            placeholder="搜歌手或曲名（如：周杰伦、房东的猫）"
+            placeholder="搜歌手或网络热歌（如：周杰伦、告五人）"
           />
           <button v-if="customQueryActive" type="button" class="back-smart-btn" @click="resetToSmart">
             恢复智能推歌
           </button>
-          <button v-else type="submit" class="song-go-btn">点歌</button>
+          <button v-else type="submit" class="song-go-btn">搜歌</button>
         </form>
       </div>
     </div>
@@ -88,7 +88,6 @@
           <div v-else class="vinyl-cover placeholder-cover">听见天气</div>
           <div class="vinyl-spindle"></div>
         </div>
-        <!-- 拟物唱臂 -->
         <div class="tonearm" :class="{ engaged: isPlaying }">
           <div class="tonearm-pivot"></div>
           <div class="tonearm-rod"></div>
@@ -103,7 +102,16 @@
               <span></span><span></span><span></span><span></span>
             </div>
             <span class="playing-status-text">
-              {{ isPlaying ? '正在播放 · 正版精华试听' : '已就绪 · 点击播放键聆听天气' }}
+              <template v-if="buffering">正在缓冲音频流…</template>
+              <template v-else-if="isPlaying && currentTrack.isLiveStream">
+                正在直播 · 国内 FM 纯 MP3 全长连播
+              </template>
+              <template v-else-if="isPlaying">
+                正在播放 · 人声高潮试听（播完自动连播下一首）
+              </template>
+              <template v-else>
+                已就绪 · 点击下方播放键或列表曲目即可播放
+              </template>
             </span>
           </div>
 
@@ -118,8 +126,28 @@
             </template>
           </p>
 
-          <!-- 进度条 -->
-          <div class="progress-area">
+          <!-- 播放异常自愈提示 -->
+          <div v-if="playbackNotice" class="playback-notice">
+            <span>{{ playbackNotice }}</span>
+            <button
+              v-if="genreMode !== 'cnradio'"
+              type="button"
+              class="switch-mp3-btn"
+              @click="selectGenre('cnradio')"
+            >
+              切至国内FM纯MP3直播
+            </button>
+          </div>
+
+          <!-- 进度条 / 实况直播条 -->
+          <div v-if="currentTrack.isLiveStream" class="live-stream-bar">
+            <span class="live-pill">LIVE 实况</span>
+            <div class="live-wave-track">
+              <div class="live-wave-fill" :class="{ moving: isPlaying }"></div>
+            </div>
+            <span class="time-text tabular-nums">{{ formatSec(currentTime) }}</span>
+          </div>
+          <div v-else class="progress-area">
             <span class="time-text tabular-nums">{{ formatSec(currentTime) }}</span>
             <input
               type="range"
@@ -145,6 +173,7 @@
               <button
                 type="button"
                 class="play-main-btn"
+                :disabled="buffering"
                 :title="isPlaying ? '暂停' : '播放'"
                 @click="togglePlay"
               >
@@ -205,20 +234,17 @@
         </template>
 
         <div v-else class="empty-deck">
-          正在根据当地实时气象为你挑选唱片…
+          正在根据当地实时气象为你挑选人声歌曲…
         </div>
       </div>
 
       <!-- 原生音频播放器 -->
       <audio
         ref="audioRef"
-        preload="metadata"
+        preload="none"
         @timeupdate="handleTimeUpdate"
         @loadedmetadata="handleLoadedMetadata"
         @ended="handleEnded"
-        @play="isPlaying = true"
-        @pause="isPlaying = false"
-        @error="handleAudioError"
       ></audio>
     </div>
 
@@ -234,8 +260,12 @@
     <!-- 实时推荐歌单列表 -->
     <div class="playlist-section">
       <div class="playlist-header">
-        <span class="playlist-title">智能匹配曲单（共 {{ tracks.length }} 首）</span>
-        <span class="playlist-tip">点击曲目即可切换黑胶试听 · 自动连播</span>
+        <span class="playlist-title">
+          {{ genreMode === 'cnradio' ? `国内音乐广播台（共 ${tracks.length} 个）` : `智能匹配人声歌单（共 ${tracks.length} 首）` }}
+        </span>
+        <span class="playlist-tip">
+          {{ genreMode === 'cnradio' ? '点击任意电台即可全长不间断收听' : '点击任意歌曲立即播放 · 自动连播' }}
+        </span>
       </div>
 
       <!-- 加载中骨架屏 -->
@@ -246,13 +276,23 @@
       <!-- 错误提示与重试 -->
       <div v-else-if="error && tracks.length === 0" class="playlist-error">
         <p>{{ error }}</p>
-        <button type="button" class="retry-btn" @click="$emit('retry')">重新获取推荐音乐</button>
+        <div class="err-btn-group">
+          <button type="button" class="retry-btn" @click="$emit('retry')">重试当前接口</button>
+          <button
+            v-if="genreMode !== 'cnradio'"
+            type="button"
+            class="retry-btn"
+            @click="selectGenre('cnradio')"
+          >
+            切换至国内FM音乐台
+          </button>
+        </div>
       </div>
 
       <!-- 空结果提示 -->
       <div v-else-if="!loading && tracks.length === 0" class="playlist-error">
-        <p>暂未检索到对应曲目，可尝试切换曲风或换一批</p>
-        <button type="button" class="retry-btn" @click="resetToSmart">恢复默认天气推荐</button>
+        <p>暂未检索到对应歌曲，可尝试切换频道或换一批</p>
+        <button type="button" class="retry-btn" @click="resetToSmart">恢复默认天气推歌</button>
       </div>
 
       <!-- 曲目渲染列表 -->
@@ -300,7 +340,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import AmbientMixer from './AmbientMixer.vue'
 import { GENRE_MODES } from '../utils/weatherMap'
 
@@ -366,34 +406,76 @@ const emit = defineEmits([
 const audioRef = ref(null)
 const currentTrack = ref(null)
 const isPlaying = ref(false)
+const buffering = ref(false)
+const playbackNotice = ref('')
 const currentTime = ref(0)
 const duration = ref(30)
-const volume = ref(0.82)
+const volume = ref(0.85)
 const songInput = ref('')
+
+// Blob URL 缓存与 Web Audio 备用解码播放句柄（彻底修复 Apple CDN 返回 audio/x-m4p 导致部分浏览器拒播的问题）
+let activeObjectUrl = null
+let fallbackCtx = null
+let fallbackSource = null
+let fallbackGain = null
+let fallbackStartOffset = 0
+let fallbackStartedAt = 0
+let fallbackTimer = null
+let playToken = 0
 
 const isCurrentFavorite = computed(() =>
   currentTrack.value ? props.favoriteIds.has(currentTrack.value.id) : false
 )
 
-// 当城市或推荐歌单更新时：默认选中新城市首曲；若之前正在播放，无缝自动续播新城市氛围曲！
+function cleanupAudioResources() {
+  if (fallbackTimer) {
+    clearInterval(fallbackTimer)
+    fallbackTimer = null
+  }
+  if (fallbackSource) {
+    try {
+      fallbackSource.onended = null
+      fallbackSource.stop()
+      fallbackSource.disconnect()
+    } catch {
+      // ignore
+    }
+    fallbackSource = null
+  }
+  if (audioRef.value) {
+    audioRef.value.pause()
+  }
+  if (activeObjectUrl) {
+    URL.revokeObjectURL(activeObjectUrl)
+    activeObjectUrl = null
+  }
+}
+
 watch(
   () => props.tracks,
   async (newList) => {
     if (!newList || newList.length === 0) return
-    const wasPlaying = isPlaying.value
+    const shouldKeepPlaying = isPlaying.value
     currentTrack.value = newList[0]
-    await loadCurrentAudio(wasPlaying)
+    playbackNotice.value = ''
+    if (shouldKeepPlaying) {
+      await startTrackPlayback(newList[0])
+    } else {
+      cleanupAudioResources()
+      currentTime.value = 0
+      duration.value = 30
+      isPlaying.value = false
+    }
   },
   { immediate: true }
 )
 
-// 从「晴雨收藏夹」点播指定歌曲
 watch(
   () => props.externalTrack,
   async (ext) => {
     if (!ext) return
     currentTrack.value = ext
-    await loadCurrentAudio(true)
+    await startTrackPlayback(ext)
   }
 )
 
@@ -401,48 +483,172 @@ watch(volume, (v) => {
   if (audioRef.value) {
     audioRef.value.volume = v
   }
+  if (fallbackGain && fallbackCtx) {
+    fallbackGain.gain.setValueAtTime(v, fallbackCtx.currentTime)
+  }
 })
 
-async function loadCurrentAudio(autoPlay = false) {
+/**
+ * 兼容性强化音频播放核心：
+ * 1. 针对国内 FM 直播 MP3 流：直接通过原生 <audio> 播放 audio/mpeg
+ * 2. 针对 iTunes 歌曲试听流：先以 CORS 拉取二进制并将 MIME 修正为标准 audio/mp4（解决 Firefox/部分 Chromium 拦截 audio/x-m4p 的问题），
+ *    若 <audio> 仍无法解码，再自动降级使用 Web Audio decodeAudioData 播放！
+ */
+async function startTrackPlayback(track) {
+  if (!track?.previewUrl) return
+  const token = ++playToken
+  cleanupAudioResources()
   await nextTick()
+
   const el = audioRef.value
-  if (!el || !currentTrack.value?.previewUrl) return
-  el.pause()
-  el.src = currentTrack.value.previewUrl
-  el.volume = volume.value
+  if (!el) return
+
+  buffering.value = true
+  playbackNotice.value = ''
   currentTime.value = 0
-  duration.value = 30
-  if (autoPlay) {
+
+  try {
+    // 路径 A：国内 FM 音乐台实况 MP3 流
+    if (track.isLiveStream) {
+      el.src = track.previewUrl
+      el.volume = volume.value
+      await el.play()
+      if (token !== playToken) return
+      isPlaying.value = true
+      buffering.value = false
+      return
+    }
+
+    // 路径 B：拉取歌曲音频字节并重写 MIME 为标准 audio/mp4
+    let arrayBuf = null
+    try {
+      const resp = await fetch(track.previewUrl)
+      if (resp.ok) {
+        arrayBuf = await resp.arrayBuffer()
+      }
+    } catch {
+      arrayBuf = null
+    }
+
+    if (token !== playToken) return
+
+    if (arrayBuf && arrayBuf.byteLength > 512) {
+      const mp4Blob = new Blob([arrayBuf], { type: 'audio/mp4' })
+      activeObjectUrl = URL.createObjectURL(mp4Blob)
+      el.src = activeObjectUrl
+    } else {
+      el.src = track.previewUrl
+    }
+
+    el.volume = volume.value
+
     try {
       await el.play()
-    } catch {
-      isPlaying.value = false
+      if (token !== playToken) return
+      isPlaying.value = true
+      buffering.value = false
+      return
+    } catch (err) {
+      // 路径 C：若 <audio> 标签不支持当前容器解码，使用 Web Audio API 直接软解播放
+      if (arrayBuf) {
+        const playedViaWebAudio = await playBufferViaWebAudio(arrayBuf, token)
+        if (playedViaWebAudio) {
+          buffering.value = false
+          return
+        }
+      }
+      throw err
     }
-  } else {
+  } catch {
+    if (token !== playToken) return
     isPlaying.value = false
+    buffering.value = false
+    playbackNotice.value = '当前浏览器或网络环境拦截了该 AAC 音频解码，可点击右侧按钮一键切换纯 MP3 国内音乐广播'
+  }
+}
+
+async function playBufferViaWebAudio(arrayBuf, token) {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext
+    if (!AudioCtx) return false
+    if (!fallbackCtx) fallbackCtx = new AudioCtx()
+    if (fallbackCtx.state === 'suspended') await fallbackCtx.resume()
+
+    const decoded = await fallbackCtx.decodeAudioData(arrayBuf.slice(0))
+    if (token !== playToken) return false
+
+    fallbackGain = fallbackCtx.createGain()
+    fallbackGain.gain.value = volume.value
+    fallbackGain.connect(fallbackCtx.destination)
+
+    const src = fallbackCtx.createBufferSource()
+    src.buffer = decoded
+    src.connect(fallbackGain)
+
+    duration.value = decoded.duration || 30
+    fallbackStartOffset = 0
+    fallbackStartedAt = fallbackCtx.currentTime
+    fallbackSource = src
+    isPlaying.value = true
+
+    fallbackTimer = setInterval(() => {
+      if (fallbackCtx && isPlaying.value) {
+        currentTime.value = Math.min(
+          duration.value,
+          fallbackStartOffset + (fallbackCtx.currentTime - fallbackStartedAt)
+        )
+      }
+    }, 200)
+
+    src.onended = () => {
+      if (token === playToken && isPlaying.value) {
+        playNext()
+      }
+    }
+
+    src.start(0)
+    return true
+  } catch {
+    return false
   }
 }
 
 async function selectTrack(track, autoPlay = true) {
   if (currentTrack.value?.id === track.id) {
-    togglePlay()
+    await togglePlay()
     return
   }
   currentTrack.value = track
-  await loadCurrentAudio(autoPlay)
+  if (autoPlay) {
+    await startTrackPlayback(track)
+  }
 }
 
 async function togglePlay() {
+  if (!currentTrack.value) return
+
+  // 若正在通过 Web Audio 备用通道播放
+  if (fallbackSource) {
+    cleanupAudioResources()
+    isPlaying.value = false
+    return
+  }
+
   const el = audioRef.value
-  if (!el || !currentTrack.value) return
-  if (el.paused) {
+  if (!el) return
+
+  if (isPlaying.value && !el.paused) {
+    el.pause()
+    isPlaying.value = false
+  } else if (el.src && el.currentTime > 0 && !currentTrack.value.isLiveStream) {
     try {
       await el.play()
+      isPlaying.value = true
     } catch {
-      isPlaying.value = false
+      await startTrackPlayback(currentTrack.value)
     }
   } else {
-    el.pause()
+    await startTrackPlayback(currentTrack.value)
   }
 }
 
@@ -461,46 +667,47 @@ function playPrev() {
 }
 
 function handleTimeUpdate() {
-  if (audioRef.value) {
+  if (audioRef.value && !fallbackSource) {
     currentTime.value = audioRef.value.currentTime || 0
   }
 }
 
 function handleLoadedMetadata() {
-  if (audioRef.value && Number.isFinite(audioRef.value.duration)) {
+  if (audioRef.value && Number.isFinite(audioRef.value.duration) && audioRef.value.duration > 0) {
     duration.value = audioRef.value.duration
   }
 }
 
 function handleEnded() {
-  playNext()
-}
-
-function handleAudioError() {
-  isPlaying.value = false
+  if (!currentTrack.value?.isLiveStream) {
+    playNext()
+  }
 }
 
 function onSeek(val) {
   const num = Number(val)
   currentTime.value = num
-  if (audioRef.value) {
+  if (audioRef.value && !fallbackSource) {
     audioRef.value.currentTime = num
   }
 }
 
 function selectGenre(id) {
   songInput.value = ''
+  playbackNotice.value = ''
   emit('change-genre', id)
 }
 
 function submitCustomSong() {
   const q = songInput.value.trim()
   if (!q) return
+  playbackNotice.value = ''
   emit('custom-search', q)
 }
 
 function resetToSmart() {
   songInput.value = ''
+  playbackNotice.value = ''
   emit('reset-custom')
 }
 
@@ -510,6 +717,14 @@ function formatSec(sec) {
   const r = s % 60
   return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`
 }
+
+onBeforeUnmount(() => {
+  cleanupAudioResources()
+  if (fallbackCtx) {
+    fallbackCtx.close().catch(() => {})
+    fallbackCtx = null
+  }
+})
 </script>
 
 <style scoped>
@@ -644,7 +859,7 @@ function formatSec(sec) {
 
 .song-input {
   height: 30px;
-  width: 205px;
+  width: 210px;
   padding: 0 11px;
   border-radius: 999px;
   border: 1px solid var(--border-subtle);
@@ -759,7 +974,6 @@ function formatSec(sec) {
   border: 3px solid #0f172a;
 }
 
-/* 唱臂 */
 .tonearm {
   position: absolute;
   top: 10px;
@@ -801,7 +1015,6 @@ function formatSec(sec) {
   background: var(--accent);
 }
 
-/* 右侧控制器 */
 .player-controls-box {
   min-width: 0;
 }
@@ -877,11 +1090,67 @@ function formatSec(sec) {
   color: var(--text-muted);
 }
 
+.playback-notice {
+  margin-top: 8px;
+  padding: 7px 11px;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.42);
+  font-size: 0.75rem;
+  color: #fde68a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.switch-mp3-btn {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: none;
+  background: #fbbf24;
+  color: #0f172a;
+  font-size: 0.73rem;
+  font-weight: 700;
+}
+
+.live-stream-bar,
 .progress-area {
   margin-top: 12px;
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.live-pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(244, 63, 94, 0.22);
+  border: 1px solid rgba(244, 63, 94, 0.5);
+  color: #fda4af;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.live-wave-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.live-wave-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  background-size: 200% 100%;
+}
+
+.live-wave-fill.moving {
+  animation: shimmer 1.8s infinite linear;
 }
 
 .time-text {
@@ -941,8 +1210,13 @@ function formatSec(sec) {
   transition: transform 0.16s;
 }
 
-.play-main-btn:hover {
+.play-main-btn:hover:not(:disabled) {
   transform: scale(1.05);
+}
+
+.play-main-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
 }
 
 .fav-track-btn {
@@ -981,7 +1255,6 @@ function formatSec(sec) {
   padding: 20px 0;
 }
 
-/* 曲目列表 */
 .playlist-section {
   display: flex;
   flex-direction: column;
@@ -1018,6 +1291,13 @@ function formatSec(sec) {
   background: rgba(255, 255, 255, 0.04);
   font-size: 0.84rem;
   color: var(--text-secondary);
+}
+
+.err-btn-group {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .retry-btn {

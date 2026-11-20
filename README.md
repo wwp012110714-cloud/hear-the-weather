@@ -61,8 +61,9 @@
 | :--- | :--- | :--- | :--- |
 | 1 | **Open-Meteo Weather, Geocoding & Air Quality API** | `Weather` / `Environment` | 中文城市经纬度检索、PM2.5 / AQI 空气质量指数、实时气象与多日预报 |
 | 2 | **Meteorologisk Institutt (MET Norway) API** | `Weather` | 全球高精度气象实时观测与未来 7 天预报（与 Open-Meteo 构成双源毫秒级竞速容灾） |
-| 3 | **Apple iTunes Search API** | `Music` | 根据气象智能映射词组实时检索华语及氛围音乐、获取高清专辑黑胶封面与正版 AAC 音频试听流 |
-| 4 | **Hong Kong Observatory Open Data API** | `Weather` | 实时查询当日中国传统农历年份、生肖与农历月日 |
+| 3 | **Apple iTunes Search API** | `Music` | 根据气象智能映射词组实时检索华语流行与网络热歌、获取高清专辑黑胶封面与正版人声试听流 |
+| 4 | **Radio Browser API** | `Music` | 实时拉取国内在线 FM 音乐广播电台列表（接入 `.cn` 纯 MP3 24 小时全长音乐实况连播） |
+| 5 | **Hong Kong Observatory Open Data API** | `Weather` | 实时查询当日中国传统农历年份、生肖与农历月日 |
 
 ---
 

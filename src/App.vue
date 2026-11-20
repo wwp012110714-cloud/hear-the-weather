@@ -76,7 +76,7 @@
           </span>
           <span class="status-item">
             <i class="status-dot" :class="{ ok: !musicError }"></i>
-            Apple iTunes Search 音乐试听 API
+            Apple iTunes & Radio Browser 音乐电台 API
           </span>
           <span class="status-item">
             <i class="status-dot" :class="{ ok: Boolean(lunarText) }"></i>
@@ -119,7 +119,8 @@ import {
   fetchBatchCityWeather,
   fetchCityFullWeather,
   fetchLunarDate,
-  fetchWeatherMusic
+  fetchWeatherMusic,
+  fetchDomesticMusicStations
 } from './services/api'
 import { WeatherSoundscape } from './utils/soundscape'
 
@@ -261,10 +262,19 @@ async function loadMusicOnly(parentSeq = requestSeq) {
   musicLoading.value = true
   musicError.value = ''
   try {
-    const queries = customQueryActive.value
-      ? [customAppliedTerm.value]
-      : musicProfile.value.queries
-    const list = await fetchWeatherMusic(queries, 10)
+    let list = []
+    if (!customQueryActive.value && genreMode.value === 'cnradio') {
+      const ew = effectiveWeather.value
+      const meta = getWeatherMeta(ew.code, ew.isDay, ew.temp)
+      list = await fetchDomesticMusicStations(meta.category, ew.isDay)
+    } else {
+      const queries = customQueryActive.value
+        ? [customAppliedTerm.value]
+        : musicProfile.value.queries
+      list = await fetchWeatherMusic(queries, 7, {
+        allowInstrumental: genreMode.value === 'pure' || customQueryActive.value
+      })
+    }
     if (parentSeq !== requestSeq) return
     tracks.value = list
   } catch (err) {
