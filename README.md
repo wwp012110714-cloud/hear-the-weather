@@ -85,3 +85,14 @@ npm run build
 ```
 
 构建完成后，将生成的 `dist/` 目录内全部静态文件上传至课程网站服务器（`http://106.13.165.42`）对应目录即可直接通过公网浏览器访问。
+
+## 界面设计系统（UI/UX Pro Max）
+
+页面视觉由 [ui-ux-pro-max skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 的设计知识库推导生成，设计规范保存在 `design-system/hear-the-weather/`：
+
+- `MASTER.md`：skill 依据「音乐流媒体 + 沉浸式」检索生成的基础设计系统（Dark Mode OLED + Aurora UI / Glassmorphism）。
+- `pages/home.md`：项目级覆盖规则（保留随天气变色的强调色、国内可访问的中文系统字体栈等）。
+
+落地要点：天气极光背景层、玻璃拟态卡片与受光描边、渐变超大温度字、专辑封面模糊氛围光、错峰入场动效；
+同时遵循 skill 的无障碍清单：全局键盘焦点环、文本对比度 ≥ 4.5:1、正文 ≥ 12px、移动端触控目标 ≥ 44px、
+`prefers-reduced-motion` 降级、修复移动端横向溢出。

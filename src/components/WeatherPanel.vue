@@ -517,7 +517,7 @@ function getDailyLabel(d) {
 
 .region-tag,
 .day-night-tag {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   padding: 2px 9px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
@@ -647,7 +647,7 @@ function getDailyLabel(d) {
 }
 
 .metric-label {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
@@ -668,7 +668,7 @@ function getDailyLabel(d) {
 }
 
 .metric-sub {
-  font-size: 0.73rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
 }
 
@@ -791,12 +791,12 @@ function getDailyLabel(d) {
 }
 
 .hour-pop {
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   color: #7dd3fc;
 }
 
 .hour-pop-muted {
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
@@ -857,7 +857,7 @@ function getDailyLabel(d) {
 }
 
 .daily-pop {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   color: #7dd3fc;
 }
 
@@ -896,7 +896,7 @@ function getDailyLabel(d) {
 }
 
 .listen-day-tag {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   padding: 2px 7px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
@@ -917,4 +917,209 @@ function getDailyLabel(d) {
     display: none;
   }
 }
+/* ===== UI/UX Pro Max 视觉精修（Aurora Glass） ===== */
+.weather-panel {
+  padding: 24px;
+}
+
+.city-heading {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.refresh-icon-btn {
+  width: 40px;
+  height: 40px;
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease,
+    transform var(--dur-base) var(--ease-out);
+}
+
+.refresh-icon-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  transform: rotate(-30deg);
+}
+
+/* 超大温度：渐变展示字形 */
+.giant-temp {
+  font-size: clamp(4rem, 9vw, 5.25rem);
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(175deg, #ffffff 35%, var(--accent-text) 120%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 8px 24px rgba(2, 6, 23, 0.35));
+}
+
+.deg-unit {
+  font-size: 1.6rem;
+  vertical-align: top;
+  color: var(--accent-text);
+}
+
+.condition-label {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.apparent-line {
+  font-size: 0.85rem;
+}
+
+.poetic-quote {
+  position: relative;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(120deg, var(--accent-soft), rgba(255, 255, 255, 0.03) 70%);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent);
+}
+
+.poetic-quote p {
+  font-family: var(--font-serif);
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.metrics-grid {
+  gap: 12px;
+}
+
+.metric-card {
+  padding: 13px 15px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--glass-highlight);
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease,
+    transform var(--dur-base) var(--ease-out);
+}
+
+.metric-card:hover {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+
+.metric-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+
+.metric-val {
+  font-size: 1.4rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-sub {
+  font-size: 0.78rem;
+}
+
+.sun-bar-track {
+  height: 6px;
+}
+
+.sun-bar-fill {
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+}
+
+.forecast-section {
+  margin-top: 20px;
+  padding-top: 18px;
+}
+
+/* 分段式切换（Segmented control） */
+.forecast-tabs {
+  padding: 4px;
+  gap: 4px;
+  border-radius: var(--radius-md);
+  background: rgba(2, 6, 23, 0.35);
+  border: 1px solid var(--border-subtle);
+}
+
+.tab-btn {
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 0.85rem;
+  transition: background var(--dur-base) var(--ease-out), color var(--dur-fast) ease;
+}
+
+.tab-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.tab-btn.active {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--on-accent);
+  font-weight: 700;
+  box-shadow: var(--shadow-glow);
+}
+
+.hourly-box {
+  background: rgba(2, 6, 23, 0.32);
+  border-radius: var(--radius-md);
+  padding: 14px 12px;
+}
+
+.hour-time {
+  font-size: 0.75rem;
+}
+
+.hour-temp {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.daily-row {
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease,
+    transform var(--dur-base) var(--ease-out);
+}
+
+.daily-row:hover {
+  transform: translateX(3px);
+}
+
+.daily-name {
+  font-size: 0.875rem;
+}
+
+.range-track {
+  height: 6px;
+}
+
+.retry-btn,
+.reset-live-btn {
+  min-height: 36px;
+  transition: background var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+
+.retry-btn:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.retry-btn:active,
+.tab-btn:active,
+.daily-row:active {
+  transform: scale(0.98);
+}
+
+@media (max-width: 600px) {
+  .weather-panel {
+    padding: 18px 16px;
+  }
+}
 </style>
+

@@ -198,7 +198,7 @@ defineEmits(['close', 'play-fav', 'remove-fav'])
 .del-fav-btn {
   padding: 4px 10px;
   border-radius: 999px;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   border: 1px solid var(--border-subtle);
   background: rgba(255, 255, 255, 0.06);
 }

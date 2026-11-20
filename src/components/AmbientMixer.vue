@@ -128,7 +128,7 @@ function onSlider(key, val) {
 }
 
 .mixer-sub {
-  font-size: 0.73rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   margin-top: 2px;
 }
@@ -190,7 +190,7 @@ function onSlider(key, val) {
 .ch-top {
   display: flex;
   justify-content: space-between;
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
 }
 
@@ -209,4 +209,74 @@ function onSlider(key, val) {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+/* ===== UI/UX Pro Max 视觉精修 ===== */
+.ambient-mixer {
+  padding: 14px 18px;
+  border-radius: var(--radius-lg);
+  background: rgba(15, 15, 35, 0.55);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--glass-highlight);
+}
+
+.mixer-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.mixer-sub {
+  font-size: 0.78rem;
+}
+
+.sound-wave-dot.active {
+  background: var(--success);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(52, 211, 153, 0.08);
+  }
+}
+
+.sync-btn,
+.expand-btn,
+.power-btn {
+  height: 38px;
+  padding: 0 15px;
+  font-size: 0.82rem;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+
+.sync-btn:active,
+.expand-btn:active,
+.power-btn:active {
+  transform: scale(0.96);
+}
+
+.power-btn:hover:not(.on) {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.power-btn.on {
+  box-shadow: var(--shadow-glow);
+}
+
+.ch-top {
+  font-size: 0.8rem;
+}
+
+@media (pointer: coarse) {
+  .sync-btn,
+  .expand-btn,
+  .power-btn {
+    min-height: 44px;
+  }
+}
 </style>
+

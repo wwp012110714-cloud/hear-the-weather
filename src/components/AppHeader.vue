@@ -235,7 +235,7 @@ onBeforeUnmount(() => {
 .app-header {
   position: relative;
   z-index: 30;
-  padding: 16px 22px;
+  padding: 18px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -250,11 +250,14 @@ onBeforeUnmount(() => {
 }
 
 .brand-logo {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border-subtle);
+  width: 50px;
+  height: 50px;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 70% 25%, var(--accent-soft), transparent 70%),
+    rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-glow), var(--glass-highlight);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -270,13 +273,17 @@ onBeforeUnmount(() => {
 
 .site-title {
   margin: 0;
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  background: linear-gradient(100deg, #ffffff 20%, var(--accent-text) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .site-sub-badge {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   letter-spacing: 0.14em;
   color: var(--accent-text);
   background: var(--accent-soft);
@@ -298,7 +305,7 @@ onBeforeUnmount(() => {
 
 .site-tagline {
   margin: 4px 0 0;
-  font-size: 0.82rem;
+  font-size: 0.875rem;
   color: var(--text-secondary);
 }
 
@@ -329,14 +336,15 @@ onBeforeUnmount(() => {
 
 .search-input {
   width: 100%;
-  height: 38px;
-  padding: 0 32px 0 36px;
+  height: 42px;
+  padding: 0 36px 0 38px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-subtle);
   background: rgba(8, 15, 28, 0.52);
   font-size: 0.85rem;
   outline: none;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
 }
 
 .search-input::placeholder {
@@ -344,8 +352,9 @@ onBeforeUnmount(() => {
 }
 
 .search-input:focus {
-  border-color: var(--accent-border);
+  border-color: var(--accent);
   background: rgba(8, 15, 28, 0.78);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .clear-btn {
@@ -353,8 +362,8 @@ onBeforeUnmount(() => {
   right: 8px;
   top: 50%;
   transform: translateY(-50%);
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border: none;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.12);
@@ -372,8 +381,9 @@ onBeforeUnmount(() => {
   right: 0;
   background: rgba(11, 20, 35, 0.96);
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 48px rgba(2, 6, 23, 0.6);
+  animation: riseIn var(--dur-base) var(--ease-out) both;
   backdrop-filter: blur(20px);
   overflow: hidden;
   z-index: 60;
@@ -405,10 +415,11 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 8px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--dur-fast) ease;
 }
 
-.result-item:hover {
+.result-item:hover,
+.result-item:focus-visible {
   background: rgba(255, 255, 255, 0.1);
 }
 
@@ -432,7 +443,7 @@ onBeforeUnmount(() => {
 }
 
 .result-coords {
-  font-size: 0.73rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   font-family: var(--font-mono);
 }
@@ -445,8 +456,8 @@ onBeforeUnmount(() => {
 }
 
 .action-pill {
-  height: 38px;
-  padding: 0 13px;
+  height: 42px;
+  padding: 0 15px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-subtle);
   background: rgba(255, 255, 255, 0.06);
@@ -454,8 +465,13 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  transition: all 0.2s;
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease,
+    transform var(--dur-fast) ease;
   white-space: nowrap;
+}
+
+.action-pill:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .action-pill:hover:not(:disabled) {
@@ -477,10 +493,28 @@ onBeforeUnmount(() => {
 .fav-count {
   background: #fb7185;
   color: #0f172a;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 999px;
+}
+
+@media (max-width: 600px) {
+  .app-header {
+    padding: 14px 16px;
+  }
+  .site-sub-badge {
+    display: none;
+  }
+  .action-btns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+  .action-pill {
+    justify-content: center;
+    height: 44px;
+  }
 }
 
 @media (max-width: 900px) {

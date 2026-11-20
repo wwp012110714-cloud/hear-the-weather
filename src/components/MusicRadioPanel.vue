@@ -75,7 +75,13 @@
     </div>
 
     <!-- 中部拟物黑胶唱机与播放控制台 -->
-    <div class="turntable-stage">
+    <div class="turntable-stage" :class="{ 'is-playing': isPlaying }">
+      <!-- 专辑封面模糊氛围光（Album art colors） -->
+      <div
+        class="stage-backdrop"
+        aria-hidden="true"
+        :style="currentTrack?.coverLg ? { backgroundImage: `url(${currentTrack.coverLg})` } : null"
+      ></div>
       <div class="vinyl-box">
         <div class="vinyl-disc" :class="{ spinning: isPlaying }">
           <div class="vinyl-grooves"></div>
@@ -164,7 +170,7 @@
           <!-- 播放主控按钮行 -->
           <div class="transport-row">
             <div class="transport-main">
-              <button type="button" class="ctrl-btn" title="上一首" @click="playPrev">
+              <button type="button" class="ctrl-btn" title="上一首" aria-label="上一首" @click="playPrev">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M6 6h2v12H6V6zm3.5 6l8.5 6V6l-8.5 6z" />
                 </svg>
@@ -175,6 +181,7 @@
                 class="play-main-btn"
                 :disabled="buffering"
                 :title="isPlaying ? '暂停' : '播放'"
+                :aria-label="isPlaying ? '暂停' : '播放'"
                 @click="togglePlay"
               >
                 <svg v-if="!isPlaying" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
@@ -185,7 +192,7 @@
                 </svg>
               </button>
 
-              <button type="button" class="ctrl-btn" title="下一首" @click="playNext">
+              <button type="button" class="ctrl-btn" title="下一首" aria-label="下一首" @click="playNext">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z" />
                 </svg>
@@ -223,6 +230,7 @@
               </svg>
               <input
                 v-model.number="volume"
+                aria-label="音乐音量"
                 type="range"
                 min="0"
                 max="1"
@@ -307,14 +315,19 @@
           :key="item.id"
           class="track-row"
           :class="{ active: currentTrack?.id === item.id }"
+          tabindex="0"
+          role="button"
+          :aria-current="currentTrack?.id === item.id ? 'true' : undefined"
           @click="selectTrack(item, true)"
+          @keydown.enter.prevent="selectTrack(item, true)"
+          @keydown.space.prevent="selectTrack(item, true)"
         >
           <span class="track-idx tabular-nums">
             <template v-if="currentTrack?.id === item.id && isPlaying">▶</template>
             <template v-else>{{ String(index + 1).padStart(2, '0') }}</template>
           </span>
 
-          <img :src="item.coverSm" :alt="item.title" class="row-cover" loading="lazy" />
+          <img :src="item.coverSm" :alt="`${item.title} 封面`" class="row-cover" loading="lazy" width="44" height="44" />
 
           <div class="row-info">
             <div class="row-title">{{ item.title }}</div>
@@ -327,6 +340,7 @@
             type="button"
             class="row-fav-btn"
             :title="favoriteIds.has(item.id) ? '取消收藏' : '收藏此刻晴雨'"
+            :aria-label="favoriteIds.has(item.id) ? '取消收藏' : '收藏此刻晴雨'"
             @click.stop="$emit('toggle-favorite', item)"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" :fill="favoriteIds.has(item.id) ? '#FB7185' : 'none'">
@@ -771,7 +785,7 @@ onBeforeUnmount(() => {
 }
 
 .mood-badge {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   font-weight: 700;
   padding: 3px 10px;
   border-radius: 999px;
@@ -780,7 +794,7 @@ onBeforeUnmount(() => {
 }
 
 .query-chip {
-  font-size: 0.73rem;
+  font-size: 0.75rem;
   padding: 2px 9px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.07);
@@ -976,7 +990,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   background: #1e293b;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
 }
 
@@ -1126,7 +1140,7 @@ onBeforeUnmount(() => {
   border: none;
   background: #fbbf24;
   color: #0f172a;
-  font-size: 0.73rem;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
@@ -1169,7 +1183,7 @@ onBeforeUnmount(() => {
 }
 
 .time-text {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   font-family: var(--font-mono);
 }
@@ -1289,7 +1303,7 @@ onBeforeUnmount(() => {
 }
 
 .playlist-tip {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
@@ -1394,7 +1408,7 @@ onBeforeUnmount(() => {
 }
 
 .row-sub {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -1447,4 +1461,344 @@ onBeforeUnmount(() => {
     grid-template-columns: 22px 40px 1fr 30px;
   }
 }
+/* ===== UI/UX Pro Max 视觉精修（Dark OLED + Album-art glow） ===== */
+.music-panel {
+  padding: 24px;
+  gap: 18px;
+}
+
+.channel-heading {
+  font-size: clamp(1.35rem, 2.4vw, 1.65rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+}
+
+.reason-line {
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.mood-badge {
+  font-size: 0.78rem;
+  padding: 4px 12px;
+  box-shadow: var(--shadow-glow);
+}
+
+.shuffle-btn {
+  height: 38px;
+  padding: 0 14px;
+  font-size: 0.84rem;
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease,
+    transform var(--dur-fast) ease;
+}
+
+.shuffle-btn:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+
+.shuffle-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* 频道胶囊 */
+.genre-pill {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 0.82rem;
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+
+.genre-pill:hover:not(.active) {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.genre-pill:active {
+  transform: scale(0.96);
+}
+
+.genre-pill.active {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--on-accent);
+  font-weight: 700;
+  box-shadow: var(--shadow-glow);
+}
+
+.song-input {
+  height: 36px;
+  width: 240px;
+  font-size: 0.82rem;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+
+.song-input::placeholder {
+  color: var(--text-muted);
+}
+
+.song-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.song-go-btn,
+.back-smart-btn {
+  height: 36px;
+  padding: 0 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+
+.song-go-btn:hover,
+.back-smart-btn:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* 黑胶舞台 */
+.turntable-stage {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 22px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(150deg, rgba(15, 15, 35, 0.82), rgba(27, 27, 48, 0.6));
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--glass-highlight), inset 0 -40px 80px -40px rgba(2, 6, 23, 0.6);
+}
+
+.stage-backdrop {
+  position: absolute;
+  inset: -40px;
+  z-index: -1;
+  background-size: cover;
+  background-position: center;
+  filter: blur(48px) saturate(160%);
+  opacity: 0.32;
+  transform: scale(1.1);
+  transition: opacity var(--dur-slow) ease, background-image var(--dur-slow) ease;
+}
+
+.turntable-stage.is-playing .stage-backdrop {
+  opacity: 0.5;
+}
+
+.vinyl-disc {
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.06);
+}
+
+.turntable-stage.is-playing .vinyl-disc {
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6), 0 0 48px -6px var(--accent-border),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.06);
+}
+
+/* 黑胶反光高光 */
+.vinyl-grooves {
+  background: conic-gradient(
+    from 30deg,
+    transparent 0deg,
+    rgba(255, 255, 255, 0.07) 40deg,
+    transparent 80deg,
+    transparent 200deg,
+    rgba(255, 255, 255, 0.05) 230deg,
+    transparent 260deg
+  );
+}
+
+.track-title {
+  font-size: clamp(1.25rem, 2.2vw, 1.5rem);
+  font-weight: 800;
+}
+
+.track-meta {
+  font-size: 0.875rem;
+}
+
+.playing-status-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.ctrl-btn {
+  width: 42px;
+  height: 42px;
+  transition: background var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+
+.ctrl-btn:active {
+  transform: scale(0.92);
+}
+
+.play-main-btn {
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(145deg, var(--accent), var(--accent-strong));
+  color: var(--on-accent);
+  box-shadow: var(--shadow-glow), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition: transform var(--dur-base) var(--ease-back), box-shadow var(--dur-base) ease;
+}
+
+.play-main-btn:hover:not(:disabled) {
+  transform: scale(1.07);
+  box-shadow: 0 14px 36px -6px var(--accent-border), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.play-main-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.fav-track-btn {
+  height: 40px;
+  padding: 0 14px;
+  font-size: 0.82rem;
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+
+.fav-track-btn:hover {
+  background: var(--surface-hover);
+}
+
+.seek-slider,
+.vol-slider {
+  height: 20px;
+}
+
+.vol-slider {
+  width: 92px;
+}
+
+/* 歌单 */
+.playlist-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.playlist-tip {
+  font-size: 0.78rem;
+}
+
+.track-list {
+  gap: 8px;
+  max-height: 380px;
+  padding: 2px 6px 2px 2px;
+}
+
+.track-row {
+  min-height: 62px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  grid-template-columns: 26px 44px minmax(0, 1fr) auto 36px;
+  gap: 12px;
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease,
+    transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) ease;
+}
+
+.track-row:hover {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+  transform: translateX(3px);
+}
+
+.track-row:active {
+  transform: scale(0.99);
+}
+
+.track-row.active {
+  background: linear-gradient(100deg, var(--accent-soft), rgba(255, 255, 255, 0.03) 85%);
+  border-color: var(--accent-border);
+  box-shadow: inset 3px 0 0 var(--accent), 0 10px 26px -14px var(--accent-border);
+}
+
+.row-cover {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+.row-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.row-sub {
+  font-size: 0.78rem;
+}
+
+.track-row.active .row-title {
+  color: var(--accent-text);
+}
+
+.row-fav-btn {
+  width: 36px;
+  height: 36px;
+  transition: background var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+
+.row-fav-btn:active {
+  transform: scale(0.88);
+}
+
+.playback-notice {
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.switch-mp3-btn {
+  min-height: 30px;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+}
+
+.retry-btn {
+  min-height: 38px;
+  font-size: 0.84rem;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+
+.retry-btn:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+@media (max-width: 720px) {
+  .music-panel {
+    padding: 18px 16px;
+  }
+  .song-search-form {
+    width: 100%;
+  }
+  .song-input {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+  .track-row {
+    grid-template-columns: 22px 44px minmax(0, 1fr) 36px;
+    gap: 10px;
+  }
+}
+
+@media (pointer: coarse) {
+  .genre-pill,
+  .song-input,
+  .song-go-btn,
+  .back-smart-btn,
+  .ctrl-btn,
+  .row-fav-btn,
+  .fav-track-btn {
+    min-height: 44px;
+  }
+  .ctrl-btn,
+  .row-fav-btn {
+    min-width: 44px;
+  }
+}
 </style>
+

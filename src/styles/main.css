@@ -1,4 +1,11 @@
+/*
+ * 《听见天气》全局设计令牌
+ * 设计系统来源：ui-ux-pro-max skill（design-system/hear-the-weather/MASTER.md + pages/home.md）
+ * 风格：Aurora Glass Night Radio — Dark Mode (OLED) 夜空基底 + 天气极光 + 玻璃拟态
+ */
 :root {
+  color-scheme: dark;
+
   --font-sans: "PingFang SC", "HarmonyOS Sans SC", "Hiragino Sans GB",
     "Microsoft YaHei", "Noto Sans SC", -apple-system, BlinkMacSystemFont,
     system-ui, sans-serif;
@@ -7,100 +14,155 @@
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Menlo", "Consolas",
     monospace;
 
+  /* 夜空基底（MASTER: Background #0F0F23 / Card #1B1B30） */
+  --night-base: #0f0f23;
+  --night-card: #1b1b30;
+
   --sky-top: #143252;
   --sky-mid: #214e78;
   --sky-bottom: #2f668a;
   --sky-glow: rgba(251, 191, 36, 0.22);
+  --aurora-a: rgba(99, 102, 241, 0.32);
+  --aurora-b: rgba(56, 189, 248, 0.22);
 
   --accent: #fbbf24;
+  --accent-strong: #f59e0b;
   --accent-soft: rgba(251, 191, 36, 0.16);
   --accent-border: rgba(251, 191, 36, 0.42);
   --accent-text: #fde68a;
+  --on-accent: #0f172a;
 
-  --surface-1: rgba(11, 20, 34, 0.62);
-  --surface-2: rgba(15, 26, 44, 0.48);
-  --surface-3: rgba(255, 255, 255, 0.06);
-  --surface-hover: rgba(255, 255, 255, 0.11);
+  --success: #34d399;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+
+  /* 玻璃拟态（skill glassmorphism：blur 10-20px / 白 10-30% / 1px 白描边） */
+  --glass-blur: 16px;
+  --surface-1: linear-gradient(
+    160deg,
+    rgba(27, 27, 48, 0.72) 0%,
+    rgba(15, 15, 35, 0.58) 100%
+  );
+  --surface-2: rgba(255, 255, 255, 0.045);
+  --surface-3: rgba(255, 255, 255, 0.065);
+  --surface-hover: rgba(255, 255, 255, 0.1);
   --border-subtle: rgba(255, 255, 255, 0.12);
   --border-strong: rgba(255, 255, 255, 0.22);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 
+  /* 文本（对比度 ≥ 4.5:1） */
   --text-primary: #f8fafc;
-  --text-secondary: rgba(241, 245, 249, 0.78);
-  --text-muted: rgba(203, 213, 225, 0.58);
+  --text-secondary: rgba(241, 245, 249, 0.82);
+  --text-muted: rgba(203, 213, 225, 0.7);
 
-  --radius-xl: 24px;
+  --radius-xl: 26px;
   --radius-lg: 18px;
-  --radius-md: 12px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
   --radius-pill: 999px;
 
-  --shadow-card: 0 20px 48px -16px rgba(4, 10, 22, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  /* 间距刻度（Density 5/10 — Standard） */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* 动效（Motion 5/10 — Standard） */
+  --dur-fast: 160ms;
+  --dur-base: 240ms;
+  --dur-slow: 420ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-back: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  --shadow-card: 0 24px 60px -24px rgba(2, 6, 23, 0.7),
+    0 2px 6px rgba(2, 6, 23, 0.25), var(--glass-highlight);
+  --shadow-glow: 0 10px 30px -8px var(--accent-border);
 }
 
-/* 天象主题色板：随城市实时天气与昼夜平滑过渡 */
+/* 天象主题色板：随城市实时天气与昼夜平滑过渡（极光色同步变化） */
 [data-sky="sunny-day"] {
-  --sky-top: #14365b;
-  --sky-mid: #215785;
-  --sky-bottom: #38759c;
-  --sky-glow: rgba(252, 211, 77, 0.28);
+  --sky-top: #13294a;
+  --sky-mid: #1e4a76;
+  --sky-bottom: #2f6890;
+  --sky-glow: rgba(252, 211, 77, 0.3);
+  --aurora-a: rgba(251, 146, 60, 0.26);
+  --aurora-b: rgba(56, 189, 248, 0.24);
   --accent: #fbbf24;
+  --accent-strong: #f59e0b;
   --accent-soft: rgba(251, 191, 36, 0.16);
-  --accent-border: rgba(251, 191, 36, 0.44);
+  --accent-border: rgba(251, 191, 36, 0.46);
   --accent-text: #fde68a;
 }
 
 [data-sky="cloudy-day"] {
-  --sky-top: #1a2d3d;
-  --sky-mid: #2b4559;
-  --sky-bottom: #3f5e73;
-  --sky-glow: rgba(125, 211, 252, 0.2);
+  --sky-top: #141f2e;
+  --sky-mid: #243a4f;
+  --sky-bottom: #375669;
+  --sky-glow: rgba(125, 211, 252, 0.22);
+  --aurora-a: rgba(148, 163, 184, 0.24);
+  --aurora-b: rgba(125, 211, 252, 0.2);
   --accent: #7dd3fc;
+  --accent-strong: #38bdf8;
   --accent-soft: rgba(125, 211, 252, 0.15);
-  --accent-border: rgba(125, 211, 252, 0.4);
+  --accent-border: rgba(125, 211, 252, 0.42);
   --accent-text: #bae6fd;
 }
 
 [data-sky="rainy"] {
-  --sky-top: #0f1e2c;
-  --sky-mid: #1a3244;
-  --sky-bottom: #26475a;
-  --sky-glow: rgba(56, 189, 248, 0.2);
+  --sky-top: #0b1522;
+  --sky-mid: #142a3c;
+  --sky-bottom: #1f4155;
+  --sky-glow: rgba(56, 189, 248, 0.22);
+  --aurora-a: rgba(45, 212, 191, 0.2);
+  --aurora-b: rgba(99, 102, 241, 0.26);
   --accent: #38bdf8;
+  --accent-strong: #0ea5e9;
   --accent-soft: rgba(56, 189, 248, 0.16);
-  --accent-border: rgba(56, 189, 248, 0.42);
+  --accent-border: rgba(56, 189, 248, 0.44);
   --accent-text: #bae6fd;
 }
 
 [data-sky="storm"] {
-  --sky-top: #101326;
-  --sky-mid: #1d2340;
-  --sky-bottom: #2a3454;
-  --sky-glow: rgba(245, 158, 11, 0.2);
+  --sky-top: #0b0d1c;
+  --sky-mid: #181d38;
+  --sky-bottom: #262f50;
+  --sky-glow: rgba(245, 158, 11, 0.22);
+  --aurora-a: rgba(139, 92, 246, 0.3);
+  --aurora-b: rgba(245, 158, 11, 0.16);
   --accent: #f59e0b;
+  --accent-strong: #d97706;
   --accent-soft: rgba(245, 158, 11, 0.17);
-  --accent-border: rgba(245, 158, 11, 0.42);
+  --accent-border: rgba(245, 158, 11, 0.44);
   --accent-text: #fde68a;
 }
 
 [data-sky="snowy"] {
-  --sky-top: #152538;
-  --sky-mid: #243d59;
-  --sky-bottom: #385878;
-  --sky-glow: rgba(224, 242, 254, 0.24);
+  --sky-top: #111e30;
+  --sky-mid: #203854;
+  --sky-bottom: #345473;
+  --sky-glow: rgba(224, 242, 254, 0.26);
+  --aurora-a: rgba(186, 230, 253, 0.24);
+  --aurora-b: rgba(165, 180, 252, 0.24);
   --accent: #bae6fd;
+  --accent-strong: #7dd3fc;
   --accent-soft: rgba(186, 230, 253, 0.16);
-  --accent-border: rgba(186, 230, 253, 0.45);
+  --accent-border: rgba(186, 230, 253, 0.46);
   --accent-text: #e0f2fe;
 }
 
 [data-sky="clear-night"] {
-  --sky-top: #070e1c;
-  --sky-mid: #101e36;
-  --sky-bottom: #1a3050;
+  --sky-top: #070b18;
+  --sky-mid: #0f1830;
+  --sky-bottom: #182a48;
   --sky-glow: rgba(253, 230, 138, 0.16);
+  --aurora-a: rgba(99, 102, 241, 0.34);
+  --aurora-b: rgba(45, 212, 191, 0.18);
   --accent: #fcd34d;
+  --accent-strong: #fbbf24;
   --accent-soft: rgba(252, 211, 77, 0.14);
-  --accent-border: rgba(252, 211, 77, 0.38);
+  --accent-border: rgba(252, 211, 77, 0.4);
   --accent-text: #fef08a;
 }
 
@@ -110,16 +172,28 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
 html,
 body {
   margin: 0;
   padding: 0;
   min-height: 100%;
   font-family: var(--font-sans);
+  line-height: 1.5;
   color: var(--text-primary);
-  background: var(--sky-top);
+  background: var(--night-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 button,
@@ -128,21 +202,92 @@ input {
   color: inherit;
 }
 
-button {
+button,
+[role="button"],
+a,
+label,
+select,
+input[type="range"] {
   cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* 全局键盘焦点环（skill ux: Focus States — High） */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+input:focus-visible {
+  outline-offset: 0;
 }
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
+/* 玻璃拟态卡片 */
 .glass-panel {
+  position: relative;
   background: var(--surface-1);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+}
+
+/* 顶部光泽描边：模拟玻璃受光边缘 */
+.glass-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    150deg,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0.04) 38%,
+    transparent 60%,
+    var(--accent-soft) 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* 区块小标题（eyebrow） */
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+/* 载入错峰淡入上浮（Standard Stagger 300-450ms） */
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.reveal {
+  animation: riseIn var(--dur-slow) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
 }
 
 /* 骨架屏闪烁动画 */
@@ -168,6 +313,10 @@ button {
 }
 
 /* 自定义滚动条 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -181,4 +330,29 @@ button {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+/* 范围滑块统一外观 */
+input[type="range"] {
+  accent-color: var(--accent);
+}
+
+/* 尊重系统“减少动态效果”设置（skill ux: Reduced Motion — High） */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 移动端触控目标 ≥ 44px（skill ux: Touch Target Size） */
+@media (pointer: coarse) {
+  .touch-44 {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }

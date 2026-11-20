@@ -1,11 +1,21 @@
 <template>
   <div class="app-root" :data-sky="activeSkyTheme">
+    <!-- 天气极光层（Aurora UI）：颜色随实时天象变化 -->
+    <div class="aurora-layer" aria-hidden="true">
+      <span class="aurora-blob blob-a"></span>
+      <span class="aurora-blob blob-b"></span>
+      <span class="aurora-blob blob-c"></span>
+      <span class="aurora-grain"></span>
+    </div>
+
     <!-- 背景天象粒子画布 -->
     <WeatherCanvas :sky-theme="activeSkyTheme" :enabled="canvasEnabled" />
 
     <!-- 主内容容器 -->
     <div class="page-wrapper">
       <AppHeader
+        class="reveal"
+        style="--i: 0"
         :lunar-text="lunarText"
         :favorites-count="favorites.length"
         :canvas-enabled="canvasEnabled"
@@ -19,6 +29,8 @@
 
       <!-- 城市实时天气漫游条 -->
       <CityRoamBar
+        class="reveal"
+        style="--i: 1"
         :cities="roamBarCities"
         :current-city="currentCity"
         :snapshots="citySnapshots"
@@ -26,7 +38,7 @@
       />
 
       <!-- 定位或全局通知横幅 -->
-      <div v-if="toastMessage" class="toast-banner glass-panel">
+      <div v-if="toastMessage" class="toast-banner glass-panel" role="status">
         <span>{{ toastMessage }}</span>
         <button type="button" class="toast-close" @click="toastMessage = ''">知道了</button>
       </div>
@@ -34,6 +46,8 @@
       <!-- 双栏核心交互工作区：左侧看天气，右侧听天气 -->
       <main class="studio-grid">
         <WeatherPanel
+          class="reveal"
+          style="--i: 2"
           :city="currentCity"
           :weather="weatherData"
           :loading="weatherLoading"
@@ -44,6 +58,8 @@
         />
 
         <MusicRadioPanel
+          class="reveal"
+          style="--i: 3"
           :profile="musicProfile"
           :tracks="tracks"
           :loading="musicLoading"
@@ -69,18 +85,18 @@
       </main>
 
       <!-- 底部公共 API 实时数据源说明 -->
-      <footer class="site-footer glass-panel">
+      <footer class="site-footer glass-panel reveal" style="--i: 4">
         <div class="api-status-list">
           <span class="status-item">
-            <i class="status-dot" :class="{ ok: !weatherError }"></i>
+            <i class="status-dot" :class="{ ok: !weatherError }" aria-hidden="true"></i>
             Open-Meteo & MET Norway 实时气象与空气质量 API
           </span>
           <span class="status-item">
-            <i class="status-dot" :class="{ ok: !musicError }"></i>
+            <i class="status-dot" :class="{ ok: !musicError }" aria-hidden="true"></i>
             Apple iTunes & Radio Browser 音乐电台 API
           </span>
           <span class="status-item">
-            <i class="status-dot" :class="{ ok: Boolean(lunarText) }"></i>
+            <i class="status-dot" :class="{ ok: Boolean(lunarText) }" aria-hidden="true"></i>
             中国香港天文台农历开放数据 API
           </span>
         </div>
@@ -469,84 +485,173 @@ onBeforeUnmount(() => {
 .app-root {
   position: relative;
   min-height: 100vh;
+  overflow-x: clip;
   background:
-    radial-gradient(circle at 80% 10%, var(--sky-glow), transparent 45%),
-    linear-gradient(168deg, var(--sky-top) 0%, var(--sky-mid) 52%, var(--sky-bottom) 100%);
-  transition: background 0.8s ease;
+    radial-gradient(120% 70% at 85% -10%, var(--sky-glow), transparent 55%),
+    linear-gradient(172deg, var(--sky-top) 0%, var(--sky-mid) 46%, var(--night-base) 100%);
+  transition: background var(--dur-slow) ease;
 }
 
+/* ---------- 极光层 ---------- */
+.aurora-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.9;
+  transition: background 1.2s ease;
+  will-change: transform;
+}
+
+.blob-a {
+  width: 52vw;
+  height: 52vw;
+  max-width: 760px;
+  max-height: 760px;
+  top: -18vw;
+  left: -12vw;
+  background: radial-gradient(circle, var(--aurora-a), transparent 68%);
+  animation: auroraDrift 26s ease-in-out infinite alternate;
+}
+
+.blob-b {
+  width: 46vw;
+  height: 46vw;
+  max-width: 680px;
+  max-height: 680px;
+  top: 18%;
+  right: -14vw;
+  background: radial-gradient(circle, var(--aurora-b), transparent 68%);
+  animation: auroraDrift 32s ease-in-out infinite alternate-reverse;
+}
+
+.blob-c {
+  width: 40vw;
+  height: 40vw;
+  max-width: 600px;
+  max-height: 600px;
+  bottom: -16vw;
+  left: 28%;
+  background: radial-gradient(circle, var(--sky-glow), transparent 70%);
+  animation: auroraDrift 38s ease-in-out infinite alternate;
+}
+
+/* 细颗粒噪点，避免大面积渐变出现色带 */
+.aurora-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.06;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+@keyframes auroraDrift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(6vw, 4vh, 0) scale(1.12);
+  }
+  100% {
+    transform: translate3d(-4vw, 8vh, 0) scale(0.94);
+  }
+}
+
+/* ---------- 布局 ---------- */
 .page-wrapper {
   position: relative;
   z-index: 5;
   max-width: 1360px;
   margin: 0 auto;
-  padding: 18px 20px 28px;
+  padding: var(--space-5) var(--space-5) var(--space-6);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 .toast-banner {
   padding: 10px 16px;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   border-color: var(--accent-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 0.84rem;
+  font-size: 0.875rem;
   color: var(--accent-text);
+  animation: riseIn var(--dur-base) var(--ease-out) both;
 }
 
 .toast-close {
-  padding: 3px 10px;
-  border-radius: 999px;
+  min-height: 32px;
+  padding: 4px 14px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--accent-border);
   background: transparent;
-  font-size: 0.76rem;
+  font-size: 0.8rem;
+  transition: background var(--dur-fast) ease;
+}
+
+.toast-close:hover {
+  background: var(--accent-soft);
 }
 
 .studio-grid {
   display: grid;
-  grid-template-columns: minmax(360px, 5fr) minmax(420px, 7fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: var(--space-4);
   align-items: start;
 }
 
+.studio-grid > * {
+  min-width: 0;
+}
+
+/* ---------- 页脚 ---------- */
 .site-footer {
-  padding: 13px 20px;
+  padding: 14px 22px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  font-size: 0.77rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
+  border-radius: var(--radius-lg);
 }
 
 .api-status-list {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
   flex-wrap: wrap;
 }
 
 .status-item {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .status-dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #f59e0b;
+  background: var(--warning);
   display: inline-block;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
 }
 
 .status-dot.ok {
-  background: #34d399;
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.18), 0 0 10px rgba(52, 211, 153, 0.6);
 }
 
 .footer-note {
@@ -555,13 +660,23 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1024px) {
   .studio-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (max-width: 600px) {
   .page-wrapper {
-    padding: 12px 12px 22px;
+    padding: 12px 12px 24px;
+    gap: 12px;
+  }
+  .aurora-blob {
+    filter: blur(60px);
+  }
+  .blob-a,
+  .blob-b,
+  .blob-c {
+    width: 90vw;
+    height: 90vw;
   }
 }
 </style>
