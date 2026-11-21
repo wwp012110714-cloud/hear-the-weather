@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>听见天气 · 网络诊断</title>
+<style>
+  body { margin: 0; background: #eceee9; color: #1d1b18; font: 16px/1.6 "Songti SC", "Noto Serif SC", "SimSun", serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 20px 60px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  p.lead { margin: 0 0 20px; color: #4a463f; }
+  table { width: 100%; border-collapse: collapse; background: #f6f7f3; border: 1px solid #b9bdb4; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid #d3d7cf; vertical-align: top; }
+  th { font-weight: 700; font-size: 14px; color: #4a463f; }
+  td.r { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ok { color: #1f5c2e; font-weight: 700; }
+  .bad { color: #a8321e; font-weight: 700; }
+  .wait { color: #5f5a52; }
+  small { color: #5f5a52; }
+  button { font: inherit; padding: 8px 16px; border: 1px solid #1d1b18; background: #1d1b18; color: #f6f7f3; cursor: pointer; margin-top: 16px; }
+  pre { white-space: pre-wrap; background: #f6f7f3; border: 1px solid #b9bdb4; padding: 12px; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>网络诊断</h1>
+  <p class="lead">逐项测试“听见天气”用到的接口在你当前网络下能否连通。大约 20 秒测完，请把整页截图发回来。</p>
+  <table>
+    <thead><tr><th>测试项</th><th>结果</th><th>耗时</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <button id="again" type="button">重新测试</button>
+  <pre id="env"></pre>
+</main>
+<script>
+const term = encodeURIComponent('晴天 周杰伦')
+let previewUrl = ''
+const tests = [
+  ['iTunes 搜索 · fetch（香港区）', () => viaFetch(`https://itunes.apple.com/search?term=${term}&country=HK&media=music&entity=song&limit=3`).then(itunesOk)],
+  ['iTunes 搜索 · JSONP（香港区）', () => viaJsonp(`https://itunes.apple.com/search?term=${term}&country=HK&media=music&entity=song&limit=3`).then(itunesOk)],
+  ['iTunes 搜索 · JSONP（台湾区）', () => viaJsonp(`https://itunes.apple.com/search?term=${term}&country=TW&media=music&entity=song&limit=3`).then(itunesOk)],
+  ['iTunes 搜索 · JSONP（美国区）', () => viaJsonp(`https://itunes.apple.com/search?term=${term}&country=US&media=music&entity=song&limit=3`).then(itunesOk)],
+  ['iTunes 试听音频下载', async () => {
+    if (!previewUrl) throw new Error('前面的搜索都没拿到歌曲，无法测试')
+    const r = await withTimeout(fetch(previewUrl), 15000)
+    if (!r.ok) throw new Error('HTTP ' + r.status)
+    const b = await r.arrayBuffer()
+    return `下载 ${(b.byteLength / 1024).toFixed(0)} KB · ${new URL(previewUrl).host}`
+  }],
+  ['Deezer 搜索 · JSONP（备用曲库）', () => viaJsonp(`https://api.deezer.com/search?q=${term}&limit=3&output=jsonp`).then(d => {
+    if (!d || !Array.isArray(d.data)) throw new Error('返回格式不对')
+    return `${d.data.length} 首 · ${d.data[0] ? d.data[0].title : ''}`
+  })],
+  ['Radio Browser（国内电台）', () => viaFetch('https://de1.api.radio-browser.info/json/stations/search?countrycode=CN&limit=3').then(d => `${d.length} 个电台`)],
+  ['Open-Meteo（天气）', () => viaFetch('https://api.open-meteo.com/v1/forecast?latitude=30.66&longitude=104.06&current=temperature_2m').then(d => `成都 ${d.current.temperature_2m}°C`)],
+  ['MET Norway（备用天气）', () => viaFetch('https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=30.66&lon=104.06').then(d => `${d.properties.timeseries.length} 个时次`)]
+]
+function itunesOk(d) {
+  if (!d || !Array.isArray(d.results)) throw new Error('返回格式不对')
+  if (!d.results.length) throw new Error('连通了，但返回 0 首')
+  const hit = d.results.find(x => x.previewUrl)
+  if (hit && !previewUrl) previewUrl = hit.previewUrl
+  return `${d.results.length} 首 · ${d.results[0].artistName}《${d.results[0].trackName}》`
+}
+function withTimeout(p, ms) {
+  return Promise.race([p, new Promise((_, j) => setTimeout(() => j(new Error(`超过 ${ms / 1000} 秒无响应`)), ms))])
+}
+async function viaFetch(url) {
+  const r = await withTimeout(fetch(url), 15000)
+  if (!r.ok) throw new Error('HTTP ' + r.status)
+  return r.json()
+}
+let n = 0
+function viaJsonp(url) {
+  return new Promise((resolve, reject) => {
+    const cb = '__diag' + Date.now() + n++
+    const s = document.createElement('script')
+    const t = setTimeout(() => { done(); reject(new Error('超过 15 秒无响应')) }, 15000)
+    const done = () => { clearTimeout(t); delete window[cb]; s.remove() }
+    window[cb] = d => { done(); resolve(d) }
+    s.onerror = () => { done(); reject(new Error('脚本加载失败（被拦截或连不上）')) }
+    s.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cb
+    document.head.appendChild(s)
+  })
+}
+async function run() {
+  previewUrl = ''
+  const rows = document.getElementById('rows')
+  rows.innerHTML = tests.map(([name], i) => `<tr><td>${name}</td><td id="r${i}" class="wait">测试中…</td><td id="t${i}" class="r"></td></tr>`).join('')
+  for (let i = 0; i < tests.length; i++) {
+    const t0 = performance.now()
+    try {
+      const msg = await tests[i][1]()
+      document.getElementById('r' + i).innerHTML = `<span class="ok">通</span> <small>${msg}</small>`
+    } catch (e) {
+      document.getElementById('r' + i).innerHTML = `<span class="bad">不通</span> <small>${(e && e.message) || e}</small>`
+    }
+    document.getElementById('t' + i).textContent = ((performance.now() - t0) / 1000).toFixed(1) + ' s'
+  }
+  document.getElementById('env').textContent =
+    `测试时间：${new Date().toLocaleString('zh-CN')}\n浏览器：${navigator.userAgent}\n页面：${location.href}`
+}
+document.getElementById('again').onclick = run
+run()
+</script>
+</main>
+</body>
+</html>

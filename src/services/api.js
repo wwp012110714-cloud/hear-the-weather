@@ -796,10 +796,14 @@ async function itunesSearch(term, limit) {
   const key = `${term}|${limit}`
   const cached = itCacheGet(key)
   if (cached) return cached
-  if (itRateLeft() <= 0) throw new Error('RATE')
   await itSlot()
   try {
-    if (itRateLeft() <= 0) throw new Error('RATE')
+    // 本地额度用完时排队等最早那次请求过期（最多约 25 秒），而不是直接退回电台
+    const deadline = Date.now() + 25000
+    while (itRateLeft() <= 0) {
+      if (Date.now() > deadline) throw new Error('RATE')
+      await new Promise((r) => setTimeout(r, Math.max(300, IT_RATE_WINDOW - (Date.now() - itStamps[0]) + 50)))
+    }
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=HK&lang=zh_cn&media=music&entity=song&limit=${limit}`
     const data = await itNetwork(url)
     if (Array.isArray(data?.results) && data.results.length) itCacheSet(key, data)
