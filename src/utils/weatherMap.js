@@ -199,6 +199,7 @@ export function deriveMusicProfile({
 
   let moodTitle = '晴空微风 · 华语晴日热歌'
   let moodBadge = '暖阳人声'
+  let poolKey = 'clear'
   let queries = [
     '晴天 周杰伦',
     '给你一瓶魔法药水 告五人',
@@ -209,6 +210,7 @@ export function deriveMusicProfile({
   ]
 
   if (meta.category === 'storm') {
+    poolKey = 'storm'
     moodTitle = '雷雨夜幕 · 深情华语现场'
     moodBadge = '风暴人声'
     queries = [
@@ -222,6 +224,7 @@ export function deriveMusicProfile({
     ambientPreset.rain = 72
     ambientPreset.wind = 55
   } else if (meta.category === 'rain') {
+    poolKey = 'rain'
     moodTitle = isDay ? '烟雨微凉 · 雨天走心热歌' : '夜雨敲窗 · 深夜伤感流行'
     moodBadge = '雨天人声'
     queries = [
@@ -235,6 +238,7 @@ export function deriveMusicProfile({
     ambientPreset.rain = Math.min(82, Math.max(48, Math.round(45 + precipitation * 8)))
     ambientPreset.wind = Math.max(22, ambientPreset.wind)
   } else if (meta.category === 'snow' || temp <= -2) {
+    poolKey = 'snow'
     moodTitle = '霁雪寒林 · 冬日暖心金曲'
     moodBadge = '冰雪人声'
     queries = [
@@ -248,6 +252,7 @@ export function deriveMusicProfile({
     ambientPreset.hearth = 62
     ambientPreset.wind = Math.max(28, ambientPreset.wind)
   } else if (!isDay) {
+    poolKey = 'night'
     moodTitle = temp < 10 ? '清冷星夜 · 深夜emo热歌' : '晚风微醺 · 夜色华语电台'
     moodBadge = '星夜人声'
     queries = [
@@ -261,6 +266,7 @@ export function deriveMusicProfile({
     ambientPreset.chimes = 28
     if (temp < 8) ambientPreset.hearth = 38
   } else if (temp >= 25) {
+    poolKey = 'hot'
     moodTitle = '热浪海风 · 橘子汽水热歌'
     moodBadge = '盛夏人声'
     queries = [
@@ -274,6 +280,7 @@ export function deriveMusicProfile({
     ambientPreset.wind = Math.max(42, ambientPreset.wind)
     ambientPreset.chimes = 36
   } else if (meta.category === 'cloudy' || meta.category === 'fog') {
+    poolKey = 'cloudy'
     moodTitle = '天青云影 · 微风流行与民谣'
     moodBadge = '云雾人声'
     queries = [
@@ -358,6 +365,7 @@ export function deriveMusicProfile({
     moodBadge,
     reasonText,
     queries: orderedQueries.slice(0, 4),
+    poolKey,
     ambientPreset,
     weatherMeta: meta
   }

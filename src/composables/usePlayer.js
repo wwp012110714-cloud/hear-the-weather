@@ -12,6 +12,7 @@
  *  - 每首歌开始播放后，后台预下载歌单里接下来的两首，网络慢时切歌也能立刻出声
  */
 import { ref, computed } from 'vue'
+import { refreshDeezerPreview } from '../services/api'
 
 const queue = ref([])
 const currentTrack = ref(null)
@@ -73,7 +74,7 @@ function prefetchAhead() {
   const i = list.findIndex((t) => t.id === currentTrack.value?.id)
   for (const k of [1, 2]) {
     const t = list[(i + k + list.length) % list.length]
-    if (t && t.previewUrl && !t.isLiveStream && !t.directPlay && t.id !== currentTrack.value?.id) fetchPreview(t)
+    if (t && t.previewUrl && !t.isLiveStream && t.id !== currentTrack.value?.id) fetchPreview(t)
   }
 }
 
@@ -185,6 +186,29 @@ async function start(track) {
   }
 
   try {
+    // Deezer 试听链接有时效，超过 10 分钟先换一个新链接（例如从收藏簿播放）
+    if (track.dzId && Date.now() - (track.fetchedAt || 0) > 10 * 60 * 1000) {
+      try {
+        const fresh = await refreshDeezerPreview(track)
+        if (my !== token) return
+        track = fresh
+        currentTrack.value = fresh
+      } catch {
+        /* 用旧链接试试 */
+      }
+    }
+
+    // Deezer MP3：已预下载就用内存里的数据，立即出声
+    if (track.directPlay && bufCache.has(track.id)) {
+      objectUrl = URL.createObjectURL(new Blob([bufCache.get(track.id)], { type: 'audio/mpeg' }))
+      a.src = objectUrl
+      a.volume = volume.value
+      await a.play()
+      if (my !== token) return
+      started()
+      return
+    }
+
     if (track.isLiveStream || track.directPlay) {
       a.src = track.previewUrl
       a.volume = volume.value

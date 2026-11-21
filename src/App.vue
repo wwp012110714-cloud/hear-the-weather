@@ -102,10 +102,13 @@ import {
   fetchCityFullWeather,
   fetchLunarDate,
   fetchWeatherMusic,
+  fetchPoolTracks,
+  itunesLooksDead,
   fetchDomesticMusicStations
 } from './services/api'
 import { WeatherSoundscape } from './utils/soundscape'
 import { usePlayer } from './composables/usePlayer'
+import { pickSongs, placeKey, loadSeen, saveSeen } from './utils/songPicker'
 
 const FAVORITES_STORAGE_KEY = 'hear_the_weather_favorites_v1'
 const TOUR_MS = 9000
@@ -337,11 +340,11 @@ async function loadMusicOnly(parentSeq = requestSeq) {
       const ew = effectiveWeather.value
       const meta = getWeatherMeta(ew.code, ew.isDay, ew.temp)
       list = await fetchDomesticMusicStations(meta.category, ew.isDay)
+    } else if (customQueryActive.value) {
+      list = await fetchWeatherMusic([customAppliedTerm.value], 12, { allowInstrumental: true })
     } else {
-      const queries = customQueryActive.value ? [customAppliedTerm.value] : musicProfile.value.queries
-      list = await fetchWeatherMusic(queries, 7, {
-        allowInstrumental: genreMode.value === 'pure' || customQueryActive.value
-      })
+      list = await fetchRecommended(parentSeq)
+      if (list === null) return
     }
     if (parentSeq !== requestSeq) return
     tracks.value = list
@@ -373,6 +376,35 @@ async function loadMusicOnly(parentSeq = requestSeq) {
 
 watch(tracks, (list) => player.setQueue(list))
 
+/**
+ * 按「城市 + 天气 + 曲风」从精选曲库选歌，同一个地方出现过的歌不再重复，
+ * 直到这个地方的曲库全部轮完。返回 null 表示请求已过期（用户又切了城市）。
+ */
+async function fetchRecommended(seq) {
+  const place = placeKey(currentCity.value.name, genreMode.value)
+  const seen = loadSeen(place)
+  const pick = (source) =>
+    pickSongs({
+      cityName: currentCity.value.name,
+      poolKey: musicProfile.value.poolKey,
+      genreMode: genreMode.value,
+      seen,
+      source
+    })
+  let source = itunesLooksDead() ? 'dz' : 'any'
+  let { songs, recycled } = pick(source)
+  let list = await fetchPoolTracks(songs)
+  // 这一次才发现 iTunes 连不上、拿到的歌偏少：改为只挑 Deezer 上有的歌再取一次
+  if (source === 'any' && itunesLooksDead() && list.length < 8) {
+    ;({ songs, recycled } = pick('dz'))
+    list = await fetchPoolTracks(songs)
+  }
+  if (seq !== requestSeq) return null
+  const shown = list.map((t) => t.id.replace(/^s:/, ''))
+  saveSeen(place, recycled ? new Set(shown) : new Set([...seen, ...shown]))
+  return list
+}
+
 // 退回电台后 45 秒自动再检索一次歌曲；找到就换回歌曲（限流一般一分钟内解除）
 let recoveryTimer = null
 function scheduleMusicRecovery(seq) {
@@ -380,11 +412,10 @@ function scheduleMusicRecovery(seq) {
   recoveryTimer = setTimeout(async () => {
     if (seq !== requestSeq || genreMode.value === 'cnradio' || !musicFallbackNotice.value) return
     try {
-      const queries = customQueryActive.value ? [customAppliedTerm.value] : musicProfile.value.queries
-      const list = await fetchWeatherMusic(queries, 7, {
-        allowInstrumental: genreMode.value === 'pure' || customQueryActive.value
-      })
-      if (seq !== requestSeq || !list.length || !musicFallbackNotice.value) return
+      const list = customQueryActive.value
+        ? await fetchWeatherMusic([customAppliedTerm.value], 12, { allowInstrumental: true })
+        : await fetchRecommended(seq)
+      if (seq !== requestSeq || !list?.length || !musicFallbackNotice.value) return
       tracks.value = list
       musicFallbackNotice.value = ''
     } catch {

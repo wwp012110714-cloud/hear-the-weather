@@ -8,6 +8,8 @@
  * 5. Hong Kong Observatory Open Data API (Weather 分类) — 中国传统农历干支与节令日期
  * 6. Deezer API (Music 分类) — iTunes 不可达时的备用人声曲库（JSONP + MP3 试听流）
  */
+import { songIds, songKey } from '../utils/songPicker'
+
 
 const DEFAULT_HEADERS =
   typeof window === 'undefined'
@@ -791,9 +793,34 @@ function itNetwork(url) {
   })
 }
 
+/**
+ * iTunes 在部分网络（例如部分国内移动网络、iOS 浏览器）下会被直接拦截。
+ * 一旦确认连不上，10 分钟内不再尝试，直接走 Deezer，省掉每次的等待。
+ */
+const IT_DEAD_KEY = 'htw:it-dead-until'
+export function itunesLooksDead() {
+  try {
+    return Number(sessionStorage.getItem(IT_DEAD_KEY) || 0) > Date.now()
+  } catch {
+    return false
+  }
+}
+function markItunesDead(err) {
+  if (err?.message === 'RATE') return
+  try {
+    sessionStorage.setItem(IT_DEAD_KEY, String(Date.now() + 10 * 60 * 1000))
+  } catch {
+    /* 忽略 */
+  }
+}
+
 /** 单个检索词：缓存 → 限流 → 并发控制 → 已知可用的通道 */
 async function itunesSearch(term, limit) {
-  const key = `${term}|${limit}`
+  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=HK&lang=zh_cn&media=music&entity=song&limit=${limit}`
+  return itunesCached(`${term}|${limit}`, url)
+}
+
+async function itunesCached(key, url) {
   const cached = itCacheGet(key)
   if (cached) return cached
   await itSlot()
@@ -804,7 +831,6 @@ async function itunesSearch(term, limit) {
       if (Date.now() > deadline) throw new Error('RATE')
       await new Promise((r) => setTimeout(r, Math.max(300, IT_RATE_WINDOW - (Date.now() - itStamps[0]) + 50)))
     }
-    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=HK&lang=zh_cn&media=music&entity=song&limit=${limit}`
     const data = await itNetwork(url)
     if (Array.isArray(data?.results) && data.results.length) itCacheSet(key, data)
     return data
@@ -821,9 +847,11 @@ export async function fetchWeatherMusic(queries, limitPerQuery = 7, { allowInstr
   const validQueries = (Array.isArray(queries) ? queries : [queries]).filter(Boolean)
   if (!validQueries.length) return []
 
-  let settled = await Promise.allSettled(validQueries.map((term) => itunesSearch(term, limitPerQuery)))
+  let settled = itunesLooksDead()
+    ? validQueries.map(() => ({ status: 'rejected', reason: new Error('iTunes 暂不可用') }))
+    : await Promise.allSettled(validQueries.map((term) => itunesSearch(term, limitPerQuery)))
   // 全部失败且不是因为限流：稍等后只用前两个检索词再试一次（偶发超时很常见）
-  if (settled.every((r) => r.status === 'rejected') && settled.some((r) => r.reason?.message !== 'RATE')) {
+  if (!itunesLooksDead() && settled.every((r) => r.status === 'rejected') && settled.some((r) => r.reason?.message !== 'RATE')) {
     await new Promise((r) => setTimeout(r, 1500))
     settled = await Promise.allSettled(validQueries.slice(0, 2).map((term) => itunesSearch(term, limitPerQuery)))
   }
@@ -847,8 +875,8 @@ export async function fetchWeatherMusic(queries, limitPerQuery = 7, { allowInstr
           .replace(/\s*[\(（\[【].*?[\)）\]】]/g, '')
           .trim()
           .toLowerCase()
-        const normArtist = (raw.artistName || '').slice(0, 6).toLowerCase()
-        const songKey = `${normTitle}::${normArtist}`
+        // 只按歌名去重：同一首歌的翻唱、Live、伴奏版不会挤满歌单
+        const songKey = normTitle
         if (seenSongKeys.has(songKey)) continue
 
         seenIds.add(raw.trackId)
@@ -877,6 +905,7 @@ export async function fetchWeatherMusic(queries, limitPerQuery = 7, { allowInstr
   if (tracks.length > 0) {
     return tracks.slice(0, 16)
   }
+  if (settled.every((r) => r.status === 'rejected')) markItunesDead(settled[0].reason)
 
   // iTunes 全部超时/被拦截时，自动切换至备用曲库 Deezer API（public-apis Music 分类，MP3 试听流）
   try {
@@ -912,10 +941,15 @@ async function fetchDeezerMusic(queries, allowInstrumental = false) {
   for (const item of settled) {
     if (item.status !== 'fulfilled' || !Array.isArray(item.value?.data)) continue
     for (const raw of item.value.data) {
-      if (!raw.preview || seen.has(raw.id)) continue
+      const tKey = String(raw.title_short || raw.title || '')
+        .replace(/\s*[\(（\[【].*?[\)）\]】]/g, '')
+        .trim()
+        .toLowerCase()
+      if (!raw.preview || seen.has(raw.id) || seen.has(tKey)) continue
       const text = `${raw.title || ''} ${raw.artist?.name || ''} ${raw.album?.title || ''}`
       if (!allowInstrumental && bgmFilter.test(text)) continue
       seen.add(raw.id)
+      seen.add(tKey)
       tracks.push({
         id: `dz-${raw.id}`,
         title: raw.title || '未知曲目',
@@ -934,4 +968,107 @@ async function fetchDeezerMusic(queries, allowInstrumental = false) {
     }
   }
   return tracks.slice(0, 16)
+}
+
+
+/**
+ * 8. 精选曲库：按 iTunes / Deezer 精确曲目 ID 取试听（src/data/song-ids.json）
+ * - iTunes：一次 lookup 请求取回整批歌曲，不会触发限流
+ * - iTunes 连不上或缺少某首歌时，用 Deezer 的 track 接口逐首补齐
+ * - 显示用的歌名、歌手统一取曲库里的中文写法（Deezer 上不少华语歌用英文名）
+ */
+
+function poolTrackBase(song) {
+  return {
+    id: `s:${songKey(song)}`,
+    title: song.t,
+    artist: song.a,
+    releaseYear: '',
+    durationMs: 30000,
+    isLiveStream: false
+  }
+}
+
+async function itunesLookup(songs) {
+  const withIt = songs.filter((s) => songIds(s)?.it)
+  if (!withIt.length) return []
+  const ids = withIt.map((s) => songIds(s).it)
+  const url = `https://itunes.apple.com/lookup?id=${ids.join(',')}&country=HK&entity=song`
+  const data = await itunesCached(`lookup|${ids.join(',')}`, url)
+  const byId = new Map((data?.results || []).filter((r) => r.previewUrl).map((r) => [r.trackId, r]))
+  return withIt
+    .map((s) => {
+      const r = byId.get(songIds(s).it)
+      if (!r) return null
+      return {
+        ...poolTrackBase(s),
+        album: r.collectionName || '单曲',
+        genre: r.primaryGenreName || '华语流行',
+        releaseYear: r.releaseDate ? r.releaseDate.slice(0, 4) : '',
+        previewUrl: r.previewUrl,
+        coverSm: r.artworkUrl100 || '',
+        coverLg: r.artworkUrl100 ? r.artworkUrl100.replace('100x100bb', '600x600bb') : '',
+        storeUrl: r.trackViewUrl || '',
+        source: 'iTunes'
+      }
+    })
+    .filter(Boolean)
+}
+
+function deezerTrackById(dzId) {
+  const base = `https://api.deezer.com/track/${dzId}`
+  return typeof document === 'undefined' ? fetchJsonWithTimeout(base, 10000) : fetchJsonp(`${base}?output=jsonp`, 10000)
+}
+
+async function deezerLookup(songs) {
+  const withDz = songs.filter((s) => songIds(s)?.dz)
+  const settled = await Promise.allSettled(withDz.map((s) => deezerTrackById(songIds(s).dz)))
+  return withDz
+    .map((s, i) => {
+      const r = settled[i].status === 'fulfilled' ? settled[i].value : null
+      if (!r || r.error || !r.preview) return null
+      return {
+        ...poolTrackBase(s),
+        album: r.album?.title || '单曲',
+        genre: 'Deezer',
+        previewUrl: r.preview,
+        directPlay: true,
+        dzId: r.id,
+        fetchedAt: Date.now(),
+        coverSm: r.album?.cover_small || r.album?.cover_medium || '',
+        coverLg: r.album?.cover_big || r.album?.cover_medium || '',
+        storeUrl: r.link || '',
+        source: 'Deezer'
+      }
+    })
+    .filter(Boolean)
+}
+
+function withTimeout(promise, ms) {
+  return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))])
+}
+
+export async function fetchPoolTracks(songs) {
+  let found = []
+  if (!itunesLooksDead()) {
+    try {
+      found = await withTimeout(itunesLookup(songs), 7000)
+    } catch (err) {
+      markItunesDead(err)
+    }
+  }
+  const have = new Set(found.map((t) => t.id))
+  const missing = songs.filter((s) => !have.has(`s:${songKey(s)}`))
+  if (missing.length) found = found.concat(await deezerLookup(missing))
+  if (!found.length) throw new Error('iTunes 与 Deezer 曲库都没有响应')
+  const order = new Map(songs.map((s, i) => [`s:${songKey(s)}`, i]))
+  return found.sort((a, b) => order.get(a.id) - order.get(b.id))
+}
+
+/** Deezer 试听链接带时效签名；收藏后隔一段时间再播，需要重新取一次 */
+export async function refreshDeezerPreview(track) {
+  if (!track?.dzId) return track
+  const r = await deezerTrackById(track.dzId)
+  if (!r?.preview) return track
+  return { ...track, previewUrl: r.preview, fetchedAt: Date.now() }
 }
