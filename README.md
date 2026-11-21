@@ -1,5 +1,7 @@
 # 听见天气（Hear the Weather）
 
+> **在线访问：<https://wwp012110714-cloud.github.io/hear-the-weather/>**（GitHub Pages，推送到 main 后由 Actions 自动构建发布）
+
 > 一个基于 **Vue 3** 构建的城市实时气象感知与氛围音乐漫游单页应用（SPA）——**让你不仅能看见各地阴晴冷暖，还能听见此刻天气里的旋律与风声。**
 
 ---
