@@ -4,6 +4,12 @@
  *  A. FM 直播 / Deezer MP3：<audio> 原生播放
  *  B. iTunes 试听：fetch 字节 → Blob(audio/mp4) → <audio>
  *  C. <audio> 拒绝解码时：Web Audio decodeAudioData 软解
+ *
+ * 切歌规则（修复「页面换了歌、声音还是上一首」）：
+ *  - 一旦开始切歌，立刻清空 <audio> 里的旧音源，并把状态置为「缓冲中」而不是「正在播放」
+ *  - loadedId 记录 <audio> 里实际装的是哪首歌；只有和当前歌一致时，按「播放」才会续播
+ *  - 缓冲中再按播放键 = 取消这次加载
+ *  - 每首歌开始播放后，后台预下载歌单里接下来的两首，网络慢时切歌也能立刻出声
  */
 import { ref, computed } from 'vue'
 
@@ -24,6 +30,65 @@ let gainNode = null
 let startedAt = 0
 let ticker = null
 let token = 0
+let loadedId = null // <audio> / Web Audio 里实际装载的歌曲 id
+const pending = ref(false) // 正在为当前歌下载、解码、起播
+
+// 试听音频预取缓存：id → ArrayBuffer（最多保留 6 首）
+const bufCache = new Map()
+const inflight = new Map()
+
+function remember(id, buf) {
+  bufCache.delete(id)
+  bufCache.set(id, buf)
+  while (bufCache.size > 6) bufCache.delete(bufCache.keys().next().value)
+}
+
+function fetchPreview(track, timeoutMs = 12000) {
+  if (bufCache.has(track.id)) return Promise.resolve(bufCache.get(track.id))
+  if (inflight.has(track.id)) return inflight.get(track.id)
+  const job = (async () => {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), timeoutMs)
+    try {
+      const resp = await fetch(track.previewUrl, { signal: ctrl.signal })
+      if (!resp.ok) return null
+      const buf = await resp.arrayBuffer()
+      if (buf.byteLength <= 512) return null
+      remember(track.id, buf)
+      return buf
+    } catch {
+      return null
+    } finally {
+      clearTimeout(t)
+      inflight.delete(track.id)
+    }
+  })()
+  inflight.set(track.id, job)
+  return job
+}
+
+function prefetchAhead() {
+  const list = queue.value
+  if (list.length < 2) return
+  const i = list.findIndex((t) => t.id === currentTrack.value?.id)
+  for (const k of [1, 2]) {
+    const t = list[(i + k + list.length) % list.length]
+    if (t && t.previewUrl && !t.isLiveStream && !t.directPlay && t.id !== currentTrack.value?.id) fetchPreview(t)
+  }
+}
+
+/** 彻底卸下 <audio> 里的旧音源，之后无论怎么按播放都不会再响起旧歌 */
+function unload() {
+  if (!el) return
+  el.pause()
+  el.removeAttribute('src')
+  try {
+    el.load()
+  } catch {
+    /* 无需处理 */
+  }
+  loadedId = null
+}
 
 function audio() {
   if (el) return el
@@ -36,7 +101,7 @@ function audio() {
     if (Number.isFinite(el.duration) && el.duration > 0) duration.value = el.duration
   })
   el.addEventListener('ended', () => {
-    if (!currentTrack.value?.isLiveStream) next()
+    if (loadedId && loadedId === currentTrack.value?.id && !currentTrack.value?.isLiveStream) next()
   })
   el.addEventListener('waiting', () => (buffering.value = true))
   el.addEventListener('playing', () => (buffering.value = false))
@@ -65,7 +130,7 @@ function cleanup() {
   }
 }
 
-async function viaWebAudio(buf, my) {
+async function viaWebAudio(buf, my, id) {
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext
     if (!Ctx) return false
@@ -82,6 +147,7 @@ async function viaWebAudio(buf, my) {
     duration.value = decoded.duration || 30
     startedAt = ctx.currentTime
     srcNode = s
+    loadedId = id
     isPlaying.value = true
     ticker = setInterval(() => {
       if (ctx && isPlaying.value) currentTime.value = Math.min(duration.value, ctx.currentTime - startedAt)
@@ -100,12 +166,23 @@ async function start(track) {
   if (!track?.previewUrl) return
   const my = ++token
   cleanup()
+  unload()
   const a = audio()
   currentTrack.value = track
+  isPlaying.value = false
+  pending.value = true
   buffering.value = true
   notice.value = ''
   currentTime.value = 0
   duration.value = track.isLiveStream ? 0 : 30
+
+  const started = () => {
+    loadedId = track.id
+    isPlaying.value = true
+    buffering.value = false
+    pending.value = false
+    prefetchAhead()
+  }
 
   try {
     if (track.isLiveStream || track.directPlay) {
@@ -113,27 +190,14 @@ async function start(track) {
       a.volume = volume.value
       await a.play()
       if (my !== token) return
-      isPlaying.value = true
-      buffering.value = false
+      started()
       return
     }
 
-    let buf = null
-    try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 9000)
-      try {
-        const resp = await fetch(track.previewUrl, { signal: ctrl.signal })
-        if (resp.ok) buf = await resp.arrayBuffer()
-      } finally {
-        clearTimeout(t)
-      }
-    } catch {
-      buf = null
-    }
+    const buf = await fetchPreview(track, 12000)
     if (my !== token) return
 
-    if (buf && buf.byteLength > 512) {
+    if (buf) {
       objectUrl = URL.createObjectURL(new Blob([buf], { type: 'audio/mp4' }))
       a.src = objectUrl
     } else {
@@ -143,25 +207,40 @@ async function start(track) {
     try {
       await a.play()
       if (my !== token) return
-      isPlaying.value = true
-      buffering.value = false
+      started()
     } catch (err) {
-      if (buf && (await viaWebAudio(buf, my))) {
-        buffering.value = false
+      if (my !== token) return
+      if (buf && (await viaWebAudio(buf, my, track.id))) {
+        started()
         return
       }
       throw err
     }
   } catch {
     if (my !== token) return
+    unload()
     isPlaying.value = false
     buffering.value = false
-    notice.value = '这首歌的试听音频在当前网络下解码失败。换一首，或在下方「电台」切到国内 FM 直播。'
+    pending.value = false
+    notice.value = track.isLiveStream
+      ? '这个电台暂时连不上，点「下一首」换一个台。'
+      : '这首歌的试听在当前网络下没能加载出来，点「下一首」换一首，或稍后再试。'
   }
+}
+
+/** 取消正在进行的加载（缓冲中再按播放键） */
+function cancelPending() {
+  token++
+  cleanup()
+  unload()
+  pending.value = false
+  buffering.value = false
+  isPlaying.value = false
 }
 
 async function toggle() {
   if (!currentTrack.value) return
+  if (pending.value) return cancelPending()
   if (srcNode) {
     cleanup()
     isPlaying.value = false
@@ -171,7 +250,7 @@ async function toggle() {
   if (isPlaying.value && !a.paused) {
     a.pause()
     isPlaying.value = false
-  } else if (a.src && a.currentTime > 0 && !currentTrack.value.isLiveStream) {
+  } else if (loadedId === currentTrack.value.id && a.getAttribute('src') && !currentTrack.value.isLiveStream) {
     try {
       await a.play()
       isPlaying.value = true
@@ -221,10 +300,12 @@ function setVolume(v) {
 async function setQueue(list) {
   queue.value = list || []
   if (!queue.value.length) return
-  if (isPlaying.value) {
+  if (isPlaying.value || pending.value) {
     await start(queue.value[0])
   } else {
+    token++
     cleanup()
+    unload()
     currentTrack.value = queue.value[0]
     currentTime.value = 0
     duration.value = queue.value[0].isLiveStream ? 0 : 30
@@ -250,6 +331,7 @@ export function usePlayer() {
     queue,
     currentTrack,
     isPlaying,
+    pending,
     buffering,
     notice,
     currentTime,

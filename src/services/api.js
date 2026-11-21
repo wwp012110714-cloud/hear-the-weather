@@ -649,6 +649,167 @@ export async function fetchDomesticMusicStations(weatherCategory = 'clear', isDa
 }
 
 /**
+ * iTunes 检索的稳定性处理
+ * - Apple 对同一 IP 大约每分钟只允许 20 次检索，超出后一段时间内全部拒绝。
+ *   以前每次换城市、换曲风、换一批都要连发 4 次请求，很快就会被限流，
+ *   然后整页退回「国内 FM 直播」——这就是「推歌全是电台」的主要原因。
+ * - 现在：同一检索词的结果在本地缓存 12 小时；最多两个请求同时进行；
+ *   每分钟请求数接近上限时，先只用缓存，不再白白消耗额度；
+ *   失败时记录具体原因（超时 / 被拒绝 / 限流），便于在页面上说明。
+ */
+const IT_CACHE_PREFIX = 'htw:it:v1:'
+const IT_CACHE_TTL = 12 * 3600 * 1000
+const IT_RATE_WINDOW = 60 * 1000
+const IT_RATE_MAX = 15
+const itStamps = []
+let itActive = 0
+const itWaiters = []
+
+function itCacheGet(key) {
+  try {
+    const raw = localStorage.getItem(IT_CACHE_PREFIX + key)
+    if (!raw) return null
+    const { at, data } = JSON.parse(raw)
+    if (Date.now() - at > IT_CACHE_TTL) return null
+    return data
+  } catch {
+    return null
+  }
+}
+
+function itCacheSet(key, data) {
+  try {
+    localStorage.setItem(IT_CACHE_PREFIX + key, JSON.stringify({ at: Date.now(), data }))
+  } catch {
+    // 存储已满时清掉旧缓存再试一次
+    try {
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith(IT_CACHE_PREFIX))
+        .forEach((k) => localStorage.removeItem(k))
+      localStorage.setItem(IT_CACHE_PREFIX + key, JSON.stringify({ at: Date.now(), data }))
+    } catch {
+      /* 放弃缓存 */
+    }
+  }
+}
+
+function itRateLeft() {
+  const now = Date.now()
+  while (itStamps.length && now - itStamps[0] > IT_RATE_WINDOW) itStamps.shift()
+  return IT_RATE_MAX - itStamps.length
+}
+
+async function itSlot() {
+  if (itActive < 2) {
+    itActive++
+    return
+  }
+  await new Promise((r) => itWaiters.push(r))
+  itActive++
+}
+
+function itRelease() {
+  itActive--
+  const next = itWaiters.shift()
+  if (next) next()
+}
+
+function classifyError(err) {
+  const m = String(err?.message || err || '')
+  if (m === 'RATE') return '请求太频繁'
+  if (/timeout|abort/i.test(m)) return '连接超时'
+  if (/HTTP 4\d\d/.test(m)) return '请求被拒绝'
+  return '连接失败'
+}
+
+/**
+ * 记住哪条通道在当前网络下能用（fetch 或 JSONP），之后只走这一条：
+ * 双通道同时发会让 Apple 把一次检索算成两次，更快触发限流。
+ */
+let itChannel = null
+function itNetwork(url) {
+  if (typeof document === 'undefined') {
+    itStamps.push(Date.now())
+    return fetchJsonWithTimeout(url, 15000)
+  }
+  if (itChannel === 'jsonp') {
+    itStamps.push(Date.now())
+    return fetchJsonp(url, 15000)
+  }
+  if (itChannel === 'fetch') {
+    itStamps.push(Date.now())
+    return fetchJsonWithTimeout(url, 12000).catch((err) => {
+      if (/HTTP 4\d\d/.test(err?.message)) throw err
+      itChannel = null
+      itStamps.push(Date.now())
+      return fetchJsonp(url, 15000).then((d) => ((itChannel = 'jsonp'), d))
+    })
+  }
+  // 还不知道哪条通道可用：先 fetch，2.5 秒没结果或失败再追加 JSONP，谁先成功记住谁
+  return new Promise((resolve, reject) => {
+    let done = false
+    let outstanding = 0
+    let jsonpFired = false
+    let timer = null
+    const win = (ch) => (d) => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      itChannel = ch
+      resolve(d)
+    }
+    const lose = (err) => {
+      outstanding--
+      if (!done && outstanding === 0 && jsonpFired) {
+        done = true
+        reject(err)
+      }
+    }
+    const fireJsonp = () => {
+      if (jsonpFired || done) return
+      jsonpFired = true
+      outstanding++
+      itStamps.push(Date.now())
+      fetchJsonp(url, 15000).then(win('jsonp'), lose)
+    }
+    outstanding++
+    itStamps.push(Date.now())
+    timer = setTimeout(fireJsonp, 2500)
+    fetchJsonWithTimeout(url, 15000).then(win('fetch'), (err) => {
+      if (!jsonpFired) {
+        clearTimeout(timer)
+        // 明确被拒绝（如限流 403）时，换通道也一样会被拒，直接报错
+        if (/HTTP 4\d\d/.test(err?.message)) {
+          done = true
+          reject(err)
+          return
+        }
+        fireJsonp()
+      }
+      lose(err)
+    })
+  })
+}
+
+/** 单个检索词：缓存 → 限流 → 并发控制 → 已知可用的通道 */
+async function itunesSearch(term, limit) {
+  const key = `${term}|${limit}`
+  const cached = itCacheGet(key)
+  if (cached) return cached
+  if (itRateLeft() <= 0) throw new Error('RATE')
+  await itSlot()
+  try {
+    if (itRateLeft() <= 0) throw new Error('RATE')
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=HK&lang=zh_cn&media=music&entity=song&limit=${limit}`
+    const data = await itNetwork(url)
+    if (Array.isArray(data?.results) && data.results.length) itCacheSet(key, data)
+    return data
+  } finally {
+    itRelease()
+  }
+}
+
+/**
  * 6. 动态检索华语流行与网络热歌（Apple iTunes Search API — public-apis Music 分类）
  * 默认精准剔除纯音乐/伴奏/白噪音，并对同名曲目去重，保证歌单全为人声好歌
  */
@@ -656,12 +817,12 @@ export async function fetchWeatherMusic(queries, limitPerQuery = 7, { allowInstr
   const validQueries = (Array.isArray(queries) ? queries : [queries]).filter(Boolean)
   if (!validQueries.length) return []
 
-  const tasks = validQueries.map((term) => {
-    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=HK&lang=zh_cn&media=music&entity=song&limit=${limitPerQuery}`
-    return fetchJsonDualChannel(url, 12000)
-  })
-
-  const settled = await Promise.allSettled(tasks)
+  let settled = await Promise.allSettled(validQueries.map((term) => itunesSearch(term, limitPerQuery)))
+  // 全部失败且不是因为限流：稍等后只用前两个检索词再试一次（偶发超时很常见）
+  if (settled.every((r) => r.status === 'rejected') && settled.some((r) => r.reason?.message !== 'RATE')) {
+    await new Promise((r) => setTimeout(r, 1500))
+    settled = await Promise.allSettled(validQueries.slice(0, 2).map((term) => itunesSearch(term, limitPerQuery)))
+  }
   const tracks = []
   const seenIds = new Set()
   const seenSongKeys = new Set()
@@ -722,7 +883,10 @@ export async function fetchWeatherMusic(queries, limitPerQuery = 7, { allowInstr
   }
 
   if (settled.every((s) => s.status === 'rejected')) {
-    throw new Error('歌曲接口在当前网络下连接超时（iTunes 与 Deezer 均未响应）')
+    const reason = classifyError(settled[0].reason)
+    const err = new Error(`iTunes 曲库${reason}，备用的 Deezer 也没有响应`)
+    err.reason = reason
+    throw err
   }
   return []
 }

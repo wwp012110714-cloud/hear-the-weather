@@ -327,6 +327,7 @@ async function loadCityWeatherAndMusic() {
 
 async function loadMusicOnly(parentSeq = requestSeq) {
   if (typeof parentSeq !== 'number') parentSeq = requestSeq
+  clearTimeout(recoveryTimer)
   musicLoading.value = true
   musicError.value = ''
   musicFallbackNotice.value = ''
@@ -355,7 +356,8 @@ async function loadMusicOnly(parentSeq = requestSeq) {
         if (parentSeq !== requestSeq) return
         if (list.length) {
           tracks.value = list
-          musicFallbackNotice.value = '在线曲库暂时连不上，已改播国内 FM 音乐台直播。'
+          musicFallbackNotice.value = `${err?.message || '在线曲库暂时连不上'}，先改播国内 FM 音乐台直播；稍后会自动再找歌，也可以点「重新检索歌曲」。`
+          scheduleMusicRecovery(parentSeq)
           return
         }
       } catch {
@@ -370,6 +372,26 @@ async function loadMusicOnly(parentSeq = requestSeq) {
 }
 
 watch(tracks, (list) => player.setQueue(list))
+
+// 退回电台后 45 秒自动再检索一次歌曲；找到就换回歌曲（限流一般一分钟内解除）
+let recoveryTimer = null
+function scheduleMusicRecovery(seq) {
+  clearTimeout(recoveryTimer)
+  recoveryTimer = setTimeout(async () => {
+    if (seq !== requestSeq || genreMode.value === 'cnradio' || !musicFallbackNotice.value) return
+    try {
+      const queries = customQueryActive.value ? [customAppliedTerm.value] : musicProfile.value.queries
+      const list = await fetchWeatherMusic(queries, 7, {
+        allowInstrumental: genreMode.value === 'pure' || customQueryActive.value
+      })
+      if (seq !== requestSeq || !list.length || !musicFallbackNotice.value) return
+      tracks.value = list
+      musicFallbackNotice.value = ''
+    } catch {
+      /* 仍然连不上，保持电台 */
+    }
+  }, 45000)
+}
 
 function syncAmbientToWeather() {
   ambientMix.value = { ...musicProfile.value.ambientPreset }

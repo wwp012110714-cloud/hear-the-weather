@@ -1,7 +1,7 @@
 <template>
   <div class="player-note" :class="{ live: track?.isLiveStream }">
     <p class="np-line">
-      <span class="np-key">{{ isPlaying ? '正在播放' : track ? '待播' : '选曲中' }}</span>
+      <span class="np-key">{{ pending ? '缓冲中' : isPlaying ? '正在播放' : track ? '待播' : '选曲中' }}</span>
       <span v-if="basis" class="np-basis">{{ basis }}</span>
     </p>
 
@@ -38,11 +38,11 @@
         <button
           type="button"
           class="icon-btn primary"
-          :aria-label="isPlaying ? '暂停' : '播放'"
+          :aria-label="pending ? '取消加载' : isPlaying ? '暂停' : '播放'"
           :aria-busy="buffering ? 'true' : 'false'"
           @click="toggle"
         >
-          <ChartIcon :name="isPlaying ? 'pause' : 'play'" />
+          <ChartIcon :name="isPlaying || pending ? 'pause' : 'play'" />
         </button>
         <button type="button" class="icon-btn" aria-label="下一首" @click="next"><ChartIcon name="next" /></button>
         <span class="np-spacer"></span>
@@ -57,9 +57,12 @@
           <ChartIcon :name="isFav ? 'star-on' : 'star'" />
         </button>
       </div>
-      <p v-if="buffering" class="np-hint">缓冲中…</p>
+      <p v-if="pending" class="np-hint">正在加载《{{ track.title }}》…再按一次暂停键可取消</p>
       <p v-if="notice" class="np-hint warn" role="status">{{ notice }}</p>
-      <p v-else-if="fallbackNotice" class="np-hint" role="status">{{ fallbackNotice }}</p>
+      <p v-else-if="fallbackNotice" class="np-hint" role="status">
+        {{ fallbackNotice }}
+        <button type="button" class="chart-btn np-retry" @click="$emit('retry')">重新检索歌曲</button>
+      </p>
     </template>
   </div>
 </template>
@@ -79,7 +82,7 @@ const props = defineProps({
 
 defineEmits(['toggle-favorite', 'retry'])
 
-const { currentTrack: track, isPlaying, buffering, notice, currentTime, duration, progress, toggle, next, prev, seek } =
+const { currentTrack: track, isPlaying, pending, buffering, notice, currentTime, duration, progress, toggle, next, prev, seek } =
   usePlayer()
 
 const isFav = computed(() => (track.value ? props.favoriteIds.has(track.value.id) : false))
@@ -115,6 +118,12 @@ const basisShort = computed(() => (props.basis ? '当前天气' : '天气'))
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.np-retry {
+  margin-top: 6px;
+  min-height: 32px;
+  padding: 0 10px;
 }
 
 .np-title {
